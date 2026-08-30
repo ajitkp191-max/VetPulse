@@ -1,0 +1,6 @@
+{
+  "name": "Veterinary Clinical Management & Pet Care App",
+  "description": "Comprehensive veterinary clinical management software for doctors and digital pet health portal for pet owners with AI-assisted diagnostics, ECG interpretation, appointments, and medical records.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

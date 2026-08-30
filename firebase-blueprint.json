@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "Pet": {
+      "title": "Pet",
+      "description": "Registered veterinary animal patient profile and dossier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "species": { "type": "string" },
+        "breed": { "type": "string" },
+        "gender": { "type": "string" },
+        "age": { "type": "number" },
+        "weight": { "type": "number" },
+        "ownerName": { "type": "string" },
+        "ownerPhone": { "type": "string" },
+        "ownerEmail": { "type": "string" },
+        "identificationNumber": { "type": "string" }
+      },
+      "required": ["id", "name", "species", "ownerName"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Veterinary clinical appointment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "petId": { "type": "string" },
+        "petName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "petName", "date", "status"]
+    }
+  },
+  "firestore": {
+    "/pets/{petId}": {
+      "schema": "Pet",
+      "description": "Veterinary clinic registered animal patient records"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Veterinary clinic appointment schedule"
+    }
+  }
+}
