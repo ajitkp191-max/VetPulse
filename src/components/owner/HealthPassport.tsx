@@ -16,12 +16,20 @@ import {
 import { AnimalAvatar, SpeciesBadge } from '../common/AnimalIllustration';
 
 export const HealthPassport: React.FC = () => {
-  const { pets, selectedPetId, setSelectedPetId, vaccinations, dewormings, prescriptions, adminProfile } = useApp();
+  const {
+    ownerPets,
+    selectedPetId,
+    setSelectedPetId,
+    ownerVaccinations,
+    ownerDewormings,
+    ownerPrescriptions,
+    adminProfile,
+  } = useApp();
 
-  const activePet = pets.find((p) => p.id === selectedPetId) || pets[0];
-  const petVaccines = vaccinations.filter((v) => v.petId === activePet?.id);
-  const petDewormings = dewormings.filter((d) => d.petId === activePet?.id);
-  const petRx = prescriptions.filter((p) => p.petId === activePet?.id);
+  const activePet = ownerPets.find((p) => p.id === selectedPetId) || ownerPets[0];
+  const petVaccines = ownerVaccinations.filter((v) => v.petId === activePet?.id);
+  const petDewormings = ownerDewormings.filter((d) => d.petId === activePet?.id);
+  const petRx = ownerPrescriptions.filter((p) => p.petId === activePet?.id);
 
   const handlePrintPassport = () => {
     window.print();
@@ -45,30 +53,46 @@ export const HealthPassport: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <select
-            value={activePet?.id}
-            onChange={(e) => setSelectedPetId(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white font-bold"
-          >
-            {pets.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.species})
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handlePrintPassport}
-            className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print Passport</span>
-          </button>
-        </div>
+        {ownerPets.length > 0 && (
+          <div className="flex items-center gap-3">
+            <select
+              value={activePet?.id}
+              onChange={(e) => setSelectedPetId(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white font-bold"
+            >
+              {ownerPets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.species})
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handlePrintPassport}
+              className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print Passport</span>
+            </button>
+          </div>
+        )}
       </div>
 
+      {ownerPets.length === 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center space-y-3 shadow-xs">
+          <div className="p-4 bg-teal-50 dark:bg-teal-950/60 rounded-3xl w-fit mx-auto text-teal-600">
+            <Award className="w-10 h-10" />
+          </div>
+          <h3 className="font-bold text-base text-slate-900 dark:text-white">
+            No Companion Animal Registered Under Your Account
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            To view and print an official veterinary health passport, please register your companion animal first under My Pets.
+          </p>
+        </div>
+      )}
+
       {/* Main Passport Document Card */}
-      {activePet && (
+      {ownerPets.length > 0 && activePet && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-teal-600 p-6 sm:p-8 shadow-xl space-y-6 print-container max-w-4xl mx-auto">
           {/* Passport Header Banner */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-teal-600">

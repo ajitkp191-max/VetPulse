@@ -12,10 +12,69 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- PWA & Android WebAPK Standards -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0d9488" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VetCarePro" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192.png" />
+    <script>
+      (function() {
+        // Cleanly intercept and silence benign Vite HMR websocket disconnection errors in sandboxed proxy
+        var origConsoleError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var text = args.map(function(a) { return (a && (a.message || a.stack || (typeof a === 'object' ? JSON.stringify(a) : a))) || ''; }).join(' ');
+          if (text.indexOf('WebSocket') !== -1 || text.indexOf('websocket') !== -1 || text.indexOf('closed without opened') !== -1) {
+            return;
+          }
+          return origConsoleError.apply(console, arguments);
+        };
+
+        var origConsoleWarn = console.warn;
+        console.warn = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var text = args.map(function(a) { return (a && (a.message || a.stack || (typeof a === 'object' ? JSON.stringify(a) : a))) || ''; }).join(' ');
+          if (text.indexOf('WebSocket') !== -1 || text.indexOf('websocket') !== -1 || text.indexOf('closed without opened') !== -1) {
+            return;
+          }
+          return origConsoleWarn.apply(console, arguments);
+        };
+
+        window.addEventListener('unhandledrejection', function (e) {
+          var reason = e && e.reason;
+          var msg = (reason && (reason.message || reason.description || (reason.toString && reason.toString()))) || '';
+          if (typeof msg === 'string' && (msg.includes('WebSocket') || msg.includes('websocket') || msg.includes('closed without opened'))) {
+            e.preventDefault();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          }
+        });
+        window.addEventListener('error', function (e) {
+          var msg = (e && (e.message || (e.error && e.error.message))) || '';
+          if (typeof msg === 'string' && (msg.includes('WebSocket') || msg.includes('websocket') || msg.includes('closed without opened'))) {
+            e.preventDefault();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-teal-500 selection:text-white dark:bg-slate-950 dark:text-slate-100 min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.warn('Service worker registration:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
 

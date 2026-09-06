@@ -8,7 +8,7 @@ interface AnimalIllustrationProps {
 }
 
 export const AnimalIllustration: React.FC<AnimalIllustrationProps> = ({ species, className = 'w-8 h-8' }) => {
-  const s = species.toLowerCase();
+  const s = (species || '').toLowerCase();
 
   if (s.includes('dog') || s.includes('canine')) {
     return <Dog className={className} />;
@@ -41,7 +41,7 @@ export const AnimalIllustration: React.FC<AnimalIllustrationProps> = ({ species,
 };
 
 export const SpeciesBadge: React.FC<{ species: SpeciesType | string }> = ({ species }) => {
-  const s = species.toLowerCase();
+  const s = (species || '').toLowerCase();
   let color = 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800';
 
   if (s.includes('canine') || s.includes('dog')) {
@@ -56,8 +56,8 @@ export const SpeciesBadge: React.FC<{ species: SpeciesType | string }> = ({ spec
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${color}`}>
-      <AnimalIllustration species={species} className="w-3.5 h-3.5" />
-      <span>{species}</span>
+      <AnimalIllustration species={species || 'Pet'} className="w-3.5 h-3.5" />
+      <span>{species || 'General'}</span>
     </span>
   );
 };
@@ -66,7 +66,7 @@ export const AnimalAvatar: React.FC<{
   species: SpeciesType | string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }> = ({ species, size = 'md' }) => {
-  const s = species.toLowerCase();
+  const s = (species || '').toLowerCase();
   let bg = 'bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800';
 
   if (s.includes('dog') || s.includes('canine')) {

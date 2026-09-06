@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { SpeciesType } from '../../types';
+import { PetRecord, SpeciesType } from '../../types';
 import { generateAnimalRegistrationNumber } from '../../utils/petRegistration';
 import {
   Heart,
@@ -16,6 +16,9 @@ import {
   RefreshCw,
   Activity,
   Calendar,
+  Edit3,
+  Scale,
+  Save,
 } from 'lucide-react';
 import { AnimalAvatar, SpeciesBadge } from '../common/AnimalIllustration';
 
@@ -25,17 +28,27 @@ interface MyPetsDossierProps {
 
 export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) => {
   const {
-    pets,
+    ownerPets,
     selectedPetId,
     setSelectedPetId,
     addPet,
+    updatePet,
+    showNotification,
     ownerProfile,
-    vaccinations,
-    consultations,
-    prescriptions,
+    ownerVaccinations,
+    ownerConsultations,
+    ownerPrescriptions,
   } = useApp();
 
   const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
+  const [petToEdit, setPetToEdit] = useState<PetRecord | null>(null);
+
+  // Edit form state
+  const [editAge, setEditAge] = useState('');
+  const [editWeight, setEditWeight] = useState<number | string>('');
+  const [editBreed, setEditBreed] = useState('');
+  const [editColor, setEditColor] = useState('');
+  const [editAllergies, setEditAllergies] = useState('');
 
   // Form State for new pet
   const [name, setName] = useState('');
@@ -49,10 +62,10 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
   
   // Registration Number & Owner Contact Information
   const [regNumber, setRegNumber] = useState(() => generateAnimalRegistrationNumber('Canine (Dog)'));
-  const [ownerName, setOwnerName] = useState(ownerProfile?.name || 'Ajit Kumar');
-  const [ownerPhone, setOwnerPhone] = useState(ownerProfile?.phone || '+1 (555) 234-5678');
-  const [ownerEmail, setOwnerEmail] = useState(ownerProfile?.email || 'ajitkp191@gmail.com');
-  const [ownerAddress, setOwnerAddress] = useState(ownerProfile?.address || '742 Evergreen Terrace, Metro City');
+  const [ownerName, setOwnerName] = useState(ownerProfile?.name || '');
+  const [ownerPhone, setOwnerPhone] = useState(ownerProfile?.phone || '');
+  const [ownerEmail, setOwnerEmail] = useState(ownerProfile?.email || '');
+  const [ownerAddress, setOwnerAddress] = useState(ownerProfile?.address || '');
 
   // Keep form initialized with active owner details
   useEffect(() => {
@@ -69,9 +82,33 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
     setRegNumber(generateAnimalRegistrationNumber(species));
   }, [species]);
 
-  const selectedPet = pets.find((p) => p.id === selectedPetId) || pets[0];
-  const petVaccines = vaccinations.filter((v) => v.petId === selectedPet?.id);
-  const petConsults = consultations.filter((c) => c.petId === selectedPet?.id);
+  const openEditPetModal = (pet: PetRecord) => {
+    setPetToEdit(pet);
+    setEditAge(pet.age);
+    setEditWeight(pet.weight);
+    setEditBreed(pet.breed);
+    setEditColor(pet.color || '');
+    setEditAllergies(pet.allergies?.join(', ') || '');
+  };
+
+  const handleSavePetEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!petToEdit) return;
+    const parsedWeight = parseFloat(String(editWeight));
+    updatePet(petToEdit.id, {
+      age: editAge.trim() || petToEdit.age,
+      weight: !isNaN(parsedWeight) && parsedWeight > 0 ? parsedWeight : petToEdit.weight,
+      breed: editBreed.trim() || petToEdit.breed,
+      color: editColor.trim() || petToEdit.color,
+      allergies: editAllergies.trim() ? [editAllergies.trim()] : [],
+    });
+    showNotification(`Updated ${petToEdit.name}'s weight (${editWeight} kg) & age (${editAge})`, 'success');
+    setPetToEdit(null);
+  };
+
+  const selectedPet = ownerPets.find((p) => p.id === selectedPetId) || ownerPets[0];
+  const petVaccines = ownerVaccinations.filter((v) => v.petId === selectedPet?.id);
+  const petConsults = ownerConsultations.filter((c) => c.petId === selectedPet?.id);
 
   const handleCreatePet = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +131,7 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
         : species === 'Feline (Cat)'
         ? 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=500'
         : 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=500',
+      ownerId: ownerProfile?.id,
       ownerName: ownerName.trim() || ownerProfile?.name || 'Pet Parent',
       ownerPhone: ownerPhone.trim() || ownerProfile?.phone || '+1 (555) 234-5678',
       ownerEmail: ownerEmail.trim() || ownerProfile?.email || 'owner@portal.com',
@@ -142,52 +180,77 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
       </div>
 
       {/* Grid: Pet List Left, Active Pet History Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Pets List */}
-        <div className="lg:col-span-4 space-y-3">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1 flex items-center justify-between">
-            <span>Registered Animals ({pets.length})</span>
-            <span className="text-[11px] font-normal text-amber-600 dark:text-amber-400">Select to View Dossier</span>
-          </h4>
-
-          {pets.map((pet) => {
-            const isSelected = pet.id === selectedPet?.id;
-            return (
-              <div
-                key={pet.id}
-                onClick={() => setSelectedPetId(pet.id)}
-                className={`p-4 rounded-3xl border cursor-pointer transition-all flex items-center gap-3.5 ${
-                  isSelected
-                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 shadow-sm ring-1 ring-amber-500/20'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                }`}
-              >
-                <div className="shrink-0">
-                  <AnimalAvatar species={pet.species} size="md" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                      {pet.name}
-                    </h4>
-                    <SpeciesBadge species={pet.species} />
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    {pet.breed} • {pet.age}
-                  </p>
-                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/50">
-                    <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400">
-                      Reg: {pet.identificationNumber || 'CAN-2026-001'}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {pet.weight} kg
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      {ownerPets.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center space-y-4 shadow-xs">
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/60 rounded-3xl w-fit mx-auto text-amber-500">
+            <Heart className="w-10 h-10" />
+          </div>
+          <div className="max-w-md mx-auto space-y-1.5">
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">
+              No Companion Animals Registered
+            </h3>
+            <p className="text-xs text-slate-500">
+              You are signed in as <strong className="text-slate-700 dark:text-slate-300">{ownerProfile?.name || 'Pet Parent'}</strong> ({ownerProfile?.email || ''}). Any animal you register will be permanently tied to your profile and isolated from other users.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setRegNumber(generateAnimalRegistrationNumber(species));
+              setIsAddPetModalOpen(true);
+            }}
+            className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md inline-flex items-center gap-2 transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Register Your First Companion</span>
+          </button>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Pets List */}
+          <div className="lg:col-span-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1 flex items-center justify-between">
+              <span>My Registered Animals ({ownerPets.length})</span>
+              <span className="text-[11px] font-normal text-amber-600 dark:text-amber-400">Select to View</span>
+            </h4>
+
+            {ownerPets.map((pet) => {
+              const isSelected = pet.id === selectedPet?.id;
+              return (
+                <div
+                  key={pet.id}
+                  onClick={() => setSelectedPetId(pet.id)}
+                  className={`p-4 rounded-3xl border cursor-pointer transition-all flex items-center gap-3.5 ${
+                    isSelected
+                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 shadow-sm ring-1 ring-amber-500/20'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }`}
+                >
+                  <div className="shrink-0">
+                    <AnimalAvatar species={pet.species} size="md" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                        {pet.name}
+                      </h4>
+                      <SpeciesBadge species={pet.species} />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {pet.breed} • {pet.age}
+                    </p>
+                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/50">
+                      <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                        Reg: {pet.identificationNumber || 'CAN-2026-001'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {pet.weight} kg
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
         {/* Right Active Pet Full Medical Dossier */}
         {selectedPet && (
@@ -213,6 +276,14 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openEditPetModal(selectedPet)}
+                  className="bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all"
+                  title="Update Pet Body Weight and Age"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Edit Weight & Age</span>
+                </button>
                 <button
                   onClick={() => onNavigateTab('book-appointment')}
                   className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-all"
@@ -260,7 +331,17 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
             {/* Vitals & Specs Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block">Body Weight</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 block">Body Weight</span>
+                  <button
+                    onClick={() => openEditPetModal(selectedPet)}
+                    className="text-amber-600 dark:text-amber-400 hover:underline text-[10px] font-semibold flex items-center gap-0.5"
+                    title="Edit Weight"
+                  >
+                    <Edit3 className="w-2.5 h-2.5" />
+                    <span>Edit</span>
+                  </button>
+                </div>
                 <span className="font-bold text-slate-900 dark:text-white text-sm">{selectedPet.weight} kg</span>
               </div>
               <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -301,12 +382,20 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
                   ) : (
                     <div className="space-y-2">
                       {petConsults.map((c) => (
-                        <div key={c.id} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border">
-                          <div className="flex justify-between font-semibold">
-                            <span>Dx: {c.diagnosis}</span>
+                        <div key={c.id} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-2xs">
+                          <div className="flex items-center justify-between font-semibold">
+                            <span className="text-slate-900 dark:text-white font-bold">🩺 Dx: {c.diagnosis}</span>
                             <span className="text-[10px] text-slate-400">{c.date}</span>
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1">Tx: {c.treatmentPlan}</p>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300">💊 Tx: {c.treatmentPlan}</p>
+                          <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+                            <span className="text-teal-700 dark:text-teal-300 font-medium">
+                              Attending: Dr. {c.veterinarianName || 'Attending Clinician'}
+                            </span>
+                            <span className="text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                              Reg: {c.vetRegNumber || 'VET-REG-2024'}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -342,6 +431,7 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
           </div>
         )}
       </div>
+      )}
 
       {/* REGISTER NEW PET MODAL WITH DEFAULT REGISTRATION NUMBER & OWNER CONTACT */}
       {isAddPetModalOpen && (
@@ -584,6 +674,129 @@ export const MyPetsDossier: React.FC<MyPetsDossierProps> = ({ onNavigateTab }) =
                   className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2"
                 >
                   <span>Complete Animal Registration</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Pet Body Weight & Age Modal (For Pet Owner) */}
+      {petToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 rounded-2xl">
+                  <Scale className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Update {petToEdit.name}'s Details
+                  </h3>
+                  <p className="text-xs text-slate-500">Edit Body Weight & Age (Owner Portal)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPetToEdit(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePetEdit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Body Weight (kg) *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="150"
+                      required
+                      value={editWeight}
+                      onChange={(e) => setEditWeight(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    />
+                    <span className="absolute right-3 top-2 text-xs text-slate-400 font-semibold">kg</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Pet Age *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 2 Years 3 Months"
+                    value={editAge}
+                    onChange={(e) => setEditAge(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Breed
+                </label>
+                <input
+                  type="text"
+                  value={editBreed}
+                  onChange={(e) => setEditBreed(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Coat Color
+                  </label>
+                  <input
+                    type="text"
+                    value={editColor}
+                    onChange={(e) => setEditColor(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Known Allergies
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="None, or specify"
+                    value={editAllergies}
+                    onChange={(e) => setEditAllergies(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/70 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300">
+                💡 Keeping weight and age accurate ensures proper clinical dosage calculations during prescriptions and veterinary consultations.
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPetToEdit(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>

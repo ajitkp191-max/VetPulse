@@ -13,6 +13,7 @@ import { ConsultationModule } from './components/admin/ConsultationModule';
 import { LaboratoryModule } from './components/admin/LaboratoryModule';
 import { ImagingModule } from './components/admin/ImagingModule';
 import { ECGModule } from './components/admin/ECGModule';
+import { MultiParameterDiagnosticModule } from './components/admin/MultiParameterDiagnosticModule';
 import { SurgeryModule } from './components/admin/SurgeryModule';
 import { VaccinationDewormingAdmin } from './components/admin/VaccinationDewormingAdmin';
 import { PrescriptionGenerator } from './components/admin/PrescriptionGenerator';
@@ -21,19 +22,35 @@ import { BillingModule } from './components/admin/BillingModule';
 import { InventoryAdmin } from './components/admin/InventoryAdmin';
 import { ReportsAnalytics } from './components/admin/ReportsAnalytics';
 import { AdminSettings } from './components/admin/AdminSettings';
+import { HistoryTakingModule } from './components/doctor/HistoryTakingModule';
+import { SupportQueryDesk } from './components/common/SupportQueryDesk';
+import { PetQuickSearchModal } from './components/common/PetQuickSearchModal';
 
 // Pet Owner Components
 import { OwnerAuth } from './components/owner/OwnerAuth';
 import { OwnerNav } from './components/owner/OwnerNav';
 import { OwnerDashboard } from './components/owner/OwnerDashboard';
 import { MyPetsDossier } from './components/owner/MyPetsDossier';
+import { HealthPassport } from './components/owner/HealthPassport';
+import { AiSymptomChecker } from './components/owner/AiSymptomChecker';
 import { OwnerAppointments } from './components/owner/OwnerAppointments';
 import { EmergencyFirstAid } from './components/owner/EmergencyFirstAid';
+import { OwnerPrescriptions } from './components/owner/OwnerPrescriptions';
+import { OwnerMedicalRecords } from './components/owner/OwnerMedicalRecords';
+import { OwnerVaccinationTracker } from './components/owner/OwnerVaccinationTracker';
+import { OwnerNotifications } from './components/owner/OwnerNotifications';
+import { OwnerProfileView } from './components/owner/OwnerProfileView';
+
+// Multi-tier Role Dashboards
+import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
+import { SuperAdminAuth } from './components/superadmin/SuperAdminAuth';
+import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 
 const MainAppContent: React.FC = () => {
   const {
     currentSection,
     isAdminAuthenticated,
+    isSuperAdminAuthenticated,
     isOwnerAuthenticated,
     adminActiveTab,
     setAdminActiveTab,
@@ -52,6 +69,8 @@ const MainAppContent: React.FC = () => {
         return <AdminDashboard />;
       case 'patients':
         return <PatientManagement />;
+      case 'history-taking':
+        return <HistoryTakingModule onNavigateToConsultation={() => setAdminActiveTab('consultation')} />;
       case 'appointments':
         return <AppointmentAdmin />;
       case 'consultation':
@@ -62,6 +81,8 @@ const MainAppContent: React.FC = () => {
         return <ImagingModule />;
       case 'ecg':
         return <ECGModule />;
+      case 'multiparameter-diagnostic':
+        return <MultiParameterDiagnosticModule />;
       case 'surgery':
         return <SurgeryModule />;
       case 'vaccination':
@@ -76,6 +97,8 @@ const MainAppContent: React.FC = () => {
         return <BillingModule />;
       case 'reports':
         return <ReportsAnalytics />;
+      case 'support':
+        return <SupportQueryDesk role="admin" />;
       case 'settings':
         return <AdminSettings />;
       default:
@@ -89,8 +112,22 @@ const MainAppContent: React.FC = () => {
         return <OwnerDashboard onNavigateTab={setOwnerActiveTab} />;
       case 'my-pets':
         return <MyPetsDossier onNavigateTab={setOwnerActiveTab} />;
+      case 'passport':
+        return <HealthPassport />;
+      case 'symptom-checker':
+        return <AiSymptomChecker onNavigateTab={setOwnerActiveTab} />;
       case 'book-appointment':
         return <OwnerAppointments />;
+      case 'prescriptions':
+        return <OwnerPrescriptions />;
+      case 'medical-records':
+        return <OwnerMedicalRecords />;
+      case 'vaccine-tracker':
+        return <OwnerVaccinationTracker onNavigateTab={setOwnerActiveTab} />;
+      case 'notifications':
+        return <OwnerNotifications />;
+      case 'owner-profile':
+        return <OwnerProfileView />;
       case 'emergency':
       case 'emergency-first-aid':
         return <EmergencyFirstAid />;
@@ -99,37 +136,59 @@ const MainAppContent: React.FC = () => {
     }
   };
 
+  const renderSectionView = () => {
+    switch (currentSection) {
+      case 'super_admin':
+        if (!isSuperAdminAuthenticated) {
+          return (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <SuperAdminAuth />
+            </div>
+          );
+        }
+        return (
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+            <SuperAdminDashboard />
+          </main>
+        );
+
+      case 'doctor':
+      case 'admin':
+        if (!isAdminAuthenticated) {
+          return (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <AdminAuth />
+            </div>
+          );
+        }
+        return <DoctorDashboard />;
+
+      case 'owner':
+      default:
+        if (!isOwnerAuthenticated) {
+          return (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <OwnerAuth />
+            </div>
+          );
+        }
+        return (
+          <div className="flex-1 flex flex-col w-full">
+            <OwnerNav />
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+              {renderOwnerContent()}
+            </main>
+          </div>
+        );
+    }
+  };
+
   const content = (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-teal-500 selection:text-white pb-16 md:pb-0">
       <Header />
       <NotificationToast />
-
-      {currentSection === 'admin' ? (
-        !isAdminAuthenticated ? (
-          <div className="flex-1 flex items-center justify-center p-4">
-            <AdminAuth />
-          </div>
-        ) : (
-          <div className="flex-1 flex w-full">
-            <AdminSidebar />
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
-              <AdminMobileNav />
-              {renderAdminContent()}
-            </main>
-          </div>
-        )
-      ) : !isOwnerAuthenticated ? (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <OwnerAuth />
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col w-full">
-          <OwnerNav />
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
-            {renderOwnerContent()}
-          </main>
-        </div>
-      )}
+      {renderSectionView()}
+      <PetQuickSearchModal />
     </div>
   );
 

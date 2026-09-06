@@ -20,15 +20,22 @@ interface OwnerDashboardProps {
 }
 
 export const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ onNavigateTab }) => {
-  const { pets, appointments, vaccinations, prescriptions, setSelectedPetId, ownerProfile } = useApp();
+  const {
+    ownerPets,
+    ownerAppointments,
+    ownerVaccinations,
+    ownerPrescriptions,
+    setSelectedPetId,
+    ownerProfile,
+  } = useApp();
 
-  // Find user's active pet or first pet
+  // Find user's active pet from their own registered pets
   const [activePetIndex, setActivePetIndex] = useState(0);
-  const activePet = pets[activePetIndex] || pets[0];
+  const activePet = ownerPets[activePetIndex] || ownerPets[0];
 
-  const petAppointments = appointments.filter((a) => a.petId === activePet?.id);
-  const petVaccines = vaccinations.filter((v) => v.petId === activePet?.id);
-  const petRx = prescriptions.filter((p) => p.petId === activePet?.id);
+  const petAppointments = ownerAppointments.filter((a) => a.petId === activePet?.id);
+  const petVaccines = ownerVaccinations.filter((v) => v.petId === activePet?.id);
+  const petRx = ownerPrescriptions.filter((p) => p.petId === activePet?.id);
 
   return (
     <div className="space-y-6">
@@ -37,13 +44,13 @@ export const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ onNavigateTab })
         <div className="relative z-10 max-w-xl space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold text-white mb-1">
             <Heart className="w-3.5 h-3.5 fill-white" />
-            <span>Pet Care & Health Hub</span>
+            <span>Pet Guardian Portal</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight">
             Welcome, {ownerProfile?.name || 'Pet Parent'}!
           </h2>
           <p className="text-xs sm:text-sm text-emerald-50 leading-relaxed">
-            Manage your companion animal health profiles, track vaccinations, view medical prescriptions, and schedule veterinary visits.
+            Manage your registered companion animal health profiles, track vaccinations, view medical prescriptions, and schedule veterinary visits.
           </p>
 
           <div className="pt-2 flex flex-wrap gap-2">
@@ -59,7 +66,7 @@ export const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ onNavigateTab })
               className="bg-teal-800/60 hover:bg-teal-800/80 border border-white/30 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 backdrop-blur-sm transition-all"
             >
               <Heart className="w-4 h-4 text-amber-300" />
-              <span>View Companions</span>
+              <span>My Registered Pets ({ownerPets.length})</span>
             </button>
           </div>
         </div>
@@ -75,37 +82,37 @@ export const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ onNavigateTab })
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
-            <span>My Family Companions ({pets.length})</span>
+            <span>My Registered Companions ({ownerPets.length})</span>
           </h3>
           <button
             onClick={() => onNavigateTab('my-pets')}
             className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1"
           >
-            <span>{pets.length > 0 ? 'Manage All Pets' : '+ Register Companion'}</span>
+            <span>{ownerPets.length > 0 ? 'Manage My Pets' : '+ Register Companion'}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {pets.length === 0 ? (
+        {ownerPets.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center space-y-3 shadow-xs">
             <div className="p-3 bg-amber-50 dark:bg-amber-950/60 rounded-2xl w-fit mx-auto text-amber-500">
               <Heart className="w-8 h-8" />
             </div>
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white">No Registered Companions Yet</h4>
+            <h4 className="font-bold text-sm text-slate-900 dark:text-white">No Registered Companions Under Your Account</h4>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Register your first companion animal to view health dossiers, book appointments, and track treatments.
+              You only have access to companion animals registered by you. Register your first pet to view health dossiers, book appointments, and track treatments.
             </p>
             <button
               onClick={() => onNavigateTab('my-pets')}
               className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-xs inline-flex items-center gap-1.5 transition-all"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Register New Companion</span>
+              <span>Register Your Companion</span>
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {pets.map((pet, idx) => {
+            {ownerPets.map((pet, idx) => {
               const isSelected = activePet?.id === pet.id;
               return (
                 <div

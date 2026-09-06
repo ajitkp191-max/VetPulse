@@ -96,11 +96,14 @@ export const EmergencyFirstAid: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedAid, setExpandedAid] = useState<string | null>('cpr');
 
-  const filteredToxins = TOXIC_DATABASE.filter((t) =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.symptoms.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredToxins = TOXIC_DATABASE.filter((t) => {
+    const term = (searchTerm || '').toLowerCase();
+    return (
+      (t.name || '').toLowerCase().includes(term) ||
+      (t.symptoms || '').toLowerCase().includes(term) ||
+      (t.category || '').toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">

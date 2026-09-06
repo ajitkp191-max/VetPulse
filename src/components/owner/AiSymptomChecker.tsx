@@ -21,8 +21,8 @@ interface AiSymptomCheckerProps {
 }
 
 export const AiSymptomChecker: React.FC<AiSymptomCheckerProps> = ({ onNavigateTab }) => {
-  const { pets, selectedPetId, setSelectedPetId, adminProfile, showNotification } = useApp();
-  const selectedPet = pets.find((p) => p.id === selectedPetId) || pets[0];
+  const { ownerPets, selectedPetId, setSelectedPetId, adminProfile, showNotification } = useApp();
+  const selectedPet = ownerPets.find((p) => p.id === selectedPetId) || ownerPets[0];
 
   const [symptomsInput, setSymptomsInput] = useState('Lethargic since yesterday, refusing food, and vomited yellowish bile twice this morning.');
   const [duration, setDuration] = useState('24 - 48 Hours');
@@ -44,6 +44,10 @@ export const AiSymptomChecker: React.FC<AiSymptomCheckerProps> = ({ onNavigateTa
 
   const handleRunTriage = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedPet) {
+      showNotification('Please register a companion animal first under My Pets.', 'warning');
+      return;
+    }
     if (!symptomsInput.trim()) return;
 
     setIsAiLoading(true);
@@ -86,30 +90,49 @@ export const AiSymptomChecker: React.FC<AiSymptomCheckerProps> = ({ onNavigateTa
           AI Pet Health Symptom Checker
         </h2>
         <p className="text-xs sm:text-sm text-emerald-50 leading-relaxed max-w-2xl">
-          Enter observations about {selectedPet ? selectedPet.name : 'your pet'}'s behavior, diet, or symptoms. Our intelligent veterinary model provides immediate triage guidance, red flags, and next steps.
+          Enter observations about {selectedPet ? selectedPet.name : 'your registered pet'}'s behavior, diet, or symptoms. Our intelligent veterinary model provides immediate triage guidance, red flags, and next steps.
         </p>
       </div>
 
-      {/* Input Form Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-5">
-        <form onSubmit={handleRunTriage} className="space-y-4 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                Select Pet
-              </label>
-              <select
-                value={selectedPetId}
-                onChange={(e) => setSelectedPetId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
-              >
-                {pets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.species} • {p.breed})
-                  </option>
-                ))}
-              </select>
-            </div>
+      {ownerPets.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center space-y-3 shadow-xs">
+          <div className="p-4 bg-teal-50 dark:bg-teal-950/60 rounded-3xl w-fit mx-auto text-teal-600">
+            <Heart className="w-10 h-10" />
+          </div>
+          <h3 className="font-bold text-base text-slate-900 dark:text-white">
+            No Companion Animal Registered
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Please register your companion animal in the My Pets tab before starting an AI symptom check.
+          </p>
+          <button
+            onClick={() => onNavigateTab('my-pets')}
+            className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md inline-flex items-center gap-2 transition-all"
+          >
+            <span>Go to My Pets</span>
+          </button>
+        </div>
+      ) : (
+        /* Input Form Card */
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-5">
+          <form onSubmit={handleRunTriage} className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                  Select Your Registered Companion
+                </label>
+                <select
+                  value={selectedPetId}
+                  onChange={(e) => setSelectedPetId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
+                >
+                  {ownerPets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.species} • {p.breed})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
             <div>
               <label className="block font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">
@@ -218,9 +241,10 @@ export const AiSymptomChecker: React.FC<AiSymptomCheckerProps> = ({ onNavigateTa
           </div>
         </form>
       </div>
+      )}
 
       {/* AI Triage Results Card */}
-      {triageReport && (
+      {triageReport && selectedPet && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-teal-500 p-6 shadow-xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">

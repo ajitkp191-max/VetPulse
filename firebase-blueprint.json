@@ -6,6 +6,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "ownerId": { "type": "string" },
         "name": { "type": "string" },
         "species": { "type": "string" },
         "breed": { "type": "string" },
@@ -28,12 +29,38 @@
         "petId": { "type": "string" },
         "petName": { "type": "string" },
         "ownerName": { "type": "string" },
+        "ownerPhone": { "type": "string" },
+        "ownerEmail": { "type": "string" },
         "date": { "type": "string" },
         "time": { "type": "string" },
         "reason": { "type": "string" },
         "status": { "type": "string" }
       },
       "required": ["id", "petName", "date", "status"]
+    },
+    "ClinicRegistration": {
+      "title": "ClinicRegistration",
+      "description": "New veterinarian and clinic registration request requiring 24-hour verification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "veterinarianIdNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "qualification": { "type": "string" },
+        "specialization": { "type": "string" },
+        "clinicName": { "type": "string" },
+        "clinicAddress": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "consultationTimings": { "type": "string" },
+        "status": { "type": "string" },
+        "registeredAt": { "type": "string" },
+        "verifiedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "email", "veterinarianIdNumber", "name", "clinicName", "status"]
     }
   },
   "firestore": {
@@ -44,6 +71,10 @@
     "/appointments/{appointmentId}": {
       "schema": "Appointment",
       "description": "Veterinary clinic appointment schedule"
+    },
+    "/clinic_registrations/{registrationId}": {
+      "schema": "ClinicRegistration",
+      "description": "Veterinarian license verification and approval queue"
     }
   }
 }

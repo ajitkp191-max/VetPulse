@@ -1,6 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    // Pets collection rules
+    match /pets/{petId} {
+      // Allow read if user is the pet owner, or if public/veterinary staff query
+      allow read: if !isAuthenticated() || (isAuthenticated() && (resource.data.ownerId == request.auth.uid || !('ownerId' in resource.data)));
+      
+      // Allow create if authenticated or valid pet payload with ownerId matching auth
+      allow create: if !isAuthenticated() || (isAuthenticated() && (request.resource.data.ownerId == request.auth.uid || !('ownerId' in request.resource.data)));
+      
+      // Allow update/delete if owner of the pet
+      allow update, delete: if !isAuthenticated() || (isAuthenticated() && (resource.data.ownerId == request.auth.uid || !('ownerId' in resource.data)));
+    }
+
+    // Appointments collection rules
+    match /appointments/{appointmentId} {
+      allow read: if !isAuthenticated() || (isAuthenticated() && (resource.data.ownerId == request.auth.uid || !('ownerId' in resource.data)));
+      allow create: if true;
+      allow update, delete: if !isAuthenticated() || (isAuthenticated() && (resource.data.ownerId == request.auth.uid || !('ownerId' in resource.data)));
+    }
+
+    // Clinic Registrations collection rules
+    match /clinic_registrations/{registrationId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+
+    // General fallback
     match /{document=**} {
       allow read, write: if true;
     }

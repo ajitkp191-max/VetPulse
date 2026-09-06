@@ -96,6 +96,7 @@ export const BillingModule: React.FC = () => {
       subtotal,
       discount,
       tax: taxAmount,
+      grandTotal,
       total: grandTotal,
       paymentMethod: paymentMode,
       paymentStatus: 'Paid',
@@ -163,7 +164,7 @@ export const BillingModule: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-sm font-extrabold text-teal-700 dark:text-teal-300">
-                    ${inv.total.toFixed(2)}
+                    ${(inv.grandTotal ?? inv.total ?? 0).toFixed(2)}
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                     {inv.paymentStatus} • {inv.paymentMethod}
@@ -262,10 +263,10 @@ export const BillingModule: React.FC = () => {
                           {item.category}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-center">{item.quantity}</td>
-                      <td className="py-2.5 px-3 text-right">${item.unitPrice.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-center">{item.quantity || 1}</td>
+                      <td className="py-2.5 px-3 text-right">${(item.unitPrice ?? 0).toFixed(2)}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
-                        ${item.total.toFixed(2)}
+                        ${(item.total ?? ((item.unitPrice || 0) * (item.quantity || 1))).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -278,20 +279,20 @@ export const BillingModule: React.FC = () => {
               <div className="w-64 space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Subtotal:</span>
-                  <span className="font-semibold">${activeInvoice.subtotal.toFixed(2)}</span>
+                  <span className="font-semibold">${(activeInvoice.subtotal ?? 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Discount:</span>
-                  <span className="font-semibold text-emerald-600">-${activeInvoice.discount.toFixed(2)}</span>
+                  <span className="font-semibold text-emerald-600">-${(activeInvoice.discount ?? 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Sales Tax / GST:</span>
-                  <span className="font-semibold">${activeInvoice.tax.toFixed(2)}</span>
+                  <span className="font-semibold">${(activeInvoice.tax ?? 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-white pt-2 border-t border-slate-200 dark:border-slate-700">
                   <span>Grand Total:</span>
                   <span className="text-teal-700 dark:text-teal-300 text-base">
-                    ${activeInvoice.total.toFixed(2)}
+                    ${(activeInvoice.grandTotal ?? activeInvoice.total ?? 0).toFixed(2)}
                   </span>
                 </div>
               </div>

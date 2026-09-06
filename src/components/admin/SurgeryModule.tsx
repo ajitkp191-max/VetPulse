@@ -36,10 +36,11 @@ export const SurgeryModule: React.FC = () => {
   const [isLogSurgeryModalOpen, setIsLogSurgeryModalOpen] = useState(false);
 
   const filteredSurgeries = surgeries.filter((s) => {
+    const term = (searchTerm || '').toLowerCase();
     const matchesSearch =
-      s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.speciesTarget.toLowerCase().includes(searchTerm.toLowerCase());
+      (s.title || '').toLowerCase().includes(term) ||
+      (s.category || '').toLowerCase().includes(term) ||
+      (s.speciesTarget || '').toLowerCase().includes(term);
     const matchesCategory = categoryFilter === 'All' || s.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });

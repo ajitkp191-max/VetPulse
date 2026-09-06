@@ -11,10 +11,22 @@ import {
   Phone,
   Mail,
   Award,
+  Check,
+  X,
+  AlertTriangle,
+  FileCheck2,
+  RefreshCw,
 } from 'lucide-react';
 
 export const AdminSettings: React.FC = () => {
-  const { adminProfile, updateAdminProfile, showNotification } = useApp();
+  const {
+    adminProfile,
+    updateAdminProfile,
+    showNotification,
+    clinicRegistrations,
+    approveClinicRegistration,
+    rejectClinicRegistration,
+  } = useApp();
 
   const [formData, setFormData] = useState({
     name: adminProfile.name,
@@ -51,6 +63,116 @@ export const AdminSettings: React.FC = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Maintain authorized medical credentials, registration licensing, clinic details & operating schedules.
           </p>
+        </div>
+      </div>
+
+      {/* Firebase Clinic Registration & Licensing Requests Queue */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <FileCheck2 className="w-5 h-5 text-teal-600" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Firebase Clinic Registrations & Licensing Approvals
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 px-3 py-1 rounded-full border border-teal-200 dark:border-teal-800">
+            {clinicRegistrations.filter((r) => r.status === 'pending').length} Pending 24-hr Verifications
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          When a new veterinarian registers their clinic with their <strong>Email, Password, and Veterinarian ID Number</strong>, their application is saved in Firebase. Review their license credentials below and accept their request to grant them full access.
+        </p>
+
+        <div className="space-y-3 pt-1">
+          {clinicRegistrations.map((reg) => (
+            <div
+              key={reg.id}
+              className={`p-4 rounded-2xl border transition-all ${
+                reg.status === 'pending'
+                  ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60'
+                  : reg.status === 'approved'
+                  ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50'
+                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-900 dark:text-white text-sm">{reg.name}</span>
+                    <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200 font-bold">
+                      {reg.veterinarianIdNumber || 'ID-PENDING'}
+                    </span>
+                    <span
+                      className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                        reg.status === 'pending'
+                          ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 animate-pulse'
+                          : reg.status === 'approved'
+                          ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-200'
+                          : 'bg-rose-200 text-rose-900 dark:bg-rose-900 dark:text-rose-200'
+                      }`}
+                    >
+                      {reg.status === 'pending' ? '⏳ 24-hr Review' : reg.status}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-slate-600 dark:text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span>🏥 {reg.clinicName}</span>
+                    <span>📧 {reg.email}</span>
+                    <span>📞 {reg.contactNumber}</span>
+                  </div>
+
+                  {reg.qualification && (
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      🎓 {reg.qualification} • {reg.specialization}
+                    </div>
+                  )}
+
+                  {reg.notes && (
+                    <div className="text-[11px] text-slate-500 italic mt-0.5">
+                      Note: {reg.notes}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                  {reg.status === 'pending' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => approveClinicRegistration(reg.id)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Accept on Firebase</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => rejectClinicRegistration(reg.id, 'License ID verification failed')}
+                        className="bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-semibold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Reject</span>
+                      </button>
+                    </>
+                  ) : reg.status === 'approved' ? (
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Access Granted</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => approveClinicRegistration(reg.id)}
+                      className="text-xs text-teal-600 dark:text-teal-400 font-semibold hover:underline"
+                    >
+                      Re-approve
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

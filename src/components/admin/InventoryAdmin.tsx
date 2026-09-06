@@ -23,10 +23,11 @@ export const InventoryAdmin: React.FC = () => {
   const [addQty, setAddQty] = useState(50);
 
   const filteredInventory = inventory.filter((item) => {
+    const term = (searchTerm || '').toLowerCase();
     const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
+      (item.name || '').toLowerCase().includes(term) ||
+      (item.batchNumber || '').toLowerCase().includes(term) ||
+      (item.supplier || '').toLowerCase().includes(term);
     const matchesCategory = categoryFilter === 'All' || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -142,7 +143,7 @@ export const InventoryAdmin: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-3 px-3 text-right font-bold text-slate-900 dark:text-white">
-                    ${item.unitPrice.toFixed(2)}
+                    ${(Number(item.unitPrice) || 0).toFixed(2)}
                   </td>
                   <td className="py-3 px-3 text-slate-600 dark:text-slate-300">{item.supplier}</td>
                   <td className="py-3 px-3 text-right">

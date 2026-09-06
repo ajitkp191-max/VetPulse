@@ -17,7 +17,7 @@ export function generateAnimalRegistrationNumber(species: string = 'Canine (Dog)
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   
   let prefix = 'VET';
-  const lower = species.toLowerCase();
+  const lower = (species || '').toLowerCase();
 
   if (lower.includes('dog') || lower.includes('canine')) {
     prefix = 'CAN';

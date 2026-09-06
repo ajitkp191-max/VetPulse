@@ -7,7 +7,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
-  onAuthStateChanged,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { SpeciesType, OwnerProfile } from '../../types';
@@ -23,8 +22,9 @@ import {
   ArrowRight,
   ShieldCheck,
   AlertCircle,
-  PlusCircle,
-  CheckCircle2,
+  Stethoscope,
+  KeyRound,
+  Zap,
 } from 'lucide-react';
 
 export const OwnerAuth: React.FC = () => {
@@ -33,6 +33,8 @@ export const OwnerAuth: React.FC = () => {
     ownerProfile,
     updateOwnerProfile,
     addPet,
+    setCurrentSection,
+    setUserRole,
     showNotification,
   } = useApp();
 
@@ -41,28 +43,46 @@ export const OwnerAuth: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Login credentials
-  const [email, setEmail] = useState('ajitkp191@gmail.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   // Signup fields
-  const [fullName, setFullName] = useState('Ajit Kumar');
-  const [signupEmail, setSignupEmail] = useState('ajitkp191@gmail.com');
-  const [signupPassword, setSignupPassword] = useState('petparent2026');
-  const [phone, setPhone] = useState('+1 (555) 234-5678');
-  const [address, setAddress] = useState('742 Evergreen Terrace, Metro City');
-  const [emergencyContact, setEmergencyContact] = useState('+1 (555) 987-6543 (Emergency Contact)');
+  const [fullName, setFullName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
 
   // Optional: Register first pet during signup
   const [registerInitialPet, setRegisterInitialPet] = useState(true);
-  const [petName, setPetName] = useState('Max');
+  const [petName, setPetName] = useState('');
   const [petSpecies, setPetSpecies] = useState<SpeciesType>('Canine (Dog)');
-  const [petBreed, setPetBreed] = useState('Golden Retriever');
+  const [petBreed, setPetBreed] = useState('');
   const [petRegNumber, setPetRegNumber] = useState(() => generateAnimalRegistrationNumber('Canine (Dog)'));
 
   // Update default registration number whenever species changes
   useEffect(() => {
     setPetRegNumber(generateAnimalRegistrationNumber(petSpecies));
   }, [petSpecies]);
+
+  // Demo 1-Click Login as Pet Parent
+  const handleDemoPetParentLogin = () => {
+    const demoProfile: OwnerProfile = {
+      id: 'owner_demo_1',
+      name: 'Eleanor Vance',
+      email: 'eleanor.vance@vetpulse.portal',
+      phone: '+1 (555) 782-9012',
+      address: '420 Greenfield Blvd, Metro City',
+      emergencyContact: '+1 (555) 349-1122 (Sister)',
+      photoURL: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+      authProvider: 'email',
+      registeredDate: '2025-01-15',
+    };
+    updateOwnerProfile(demoProfile);
+    setIsOwnerAuthenticated(true);
+    showNotification(`Welcome back, ${demoProfile.name}! (Pet Parent Demo Mode)`, 'success');
+  };
 
   // Handle Google Direct Sign-In
   const handleGoogleSignIn = async () => {
@@ -101,14 +121,17 @@ export const OwnerAuth: React.FC = () => {
       console.warn('Google sign-in popup error, using high-fidelity fallback:', error);
       
       // Fallback for sandboxed environments where popups might be blocked
+      const fallbackEmail = email.trim() || 'owner@vetcare.portal';
+      const fallbackName = fallbackEmail.split('@')[0].replace(/[._-]/g, ' ');
+      const formattedName = fallbackName ? (fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1)) : 'Pet Guardian';
       const fallbackProfile: OwnerProfile = {
-        id: 'google_owner_ajit',
-        name: 'Ajit Kumar',
-        email: 'ajitkp191@gmail.com',
-        phone: phone || '+1 (555) 234-5678',
-        address: address || '742 Evergreen Terrace, Metro City',
-        emergencyContact: emergencyContact || '+1 (555) 987-6543',
-        photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200',
+        id: `owner_${Date.now()}`,
+        name: formattedName,
+        email: fallbackEmail,
+        phone: phone || '',
+        address: address || '',
+        emergencyContact: emergencyContact || '',
+        photoURL: '',
         authProvider: 'google',
         registeredDate: new Date().toISOString().split('T')[0],
       };
@@ -119,7 +142,7 @@ export const OwnerAuth: React.FC = () => {
 
       updateOwnerProfile(fallbackProfile);
       setIsOwnerAuthenticated(true);
-      showNotification('Signed in with Google account (ajitkp191@gmail.com)', 'success');
+      showNotification(`Signed in as ${fallbackProfile.name}`, 'success');
     } finally {
       setLoading(false);
     }
@@ -150,17 +173,18 @@ export const OwnerAuth: React.FC = () => {
             id: user.uid,
             name: user.displayName || email.split('@')[0],
             email: user.email || email,
-            phone: phone || '+1 (555) 234-5678',
-            address: address || '742 Evergreen Terrace, Metro City',
+            phone: phone || '',
+            address: address || '',
             authProvider: 'email',
             registeredDate: new Date().toISOString().split('T')[0],
           };
         }
       } catch (authErr: any) {
-        // Allow seamless login with preconfigured owner demo credentials
+        const namePart = email.split('@')[0].replace(/[._-]/g, ' ');
+        const formattedName = namePart ? (namePart.charAt(0).toUpperCase() + namePart.slice(1)) : 'Pet Guardian';
         loggedInUser = {
           id: `owner_${Date.now()}`,
-          name: email === 'ajitkp191@gmail.com' ? 'Ajit Kumar' : email.split('@')[0],
+          name: formattedName,
           email: email,
           phone: phone,
           address: address,
@@ -259,39 +283,45 @@ export const OwnerAuth: React.FC = () => {
     }
   };
 
-  // Quick switch to demo account
-  const handleQuickDemoLogin = (ownerName: string, ownerEmail: string, ownerPhone: string, ownerAddr: string) => {
-    const demoOwner: OwnerProfile = {
-      id: `demo_${ownerEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      name: ownerName,
-      email: ownerEmail,
-      phone: ownerPhone,
-      address: ownerAddr,
-      authProvider: 'demo',
-      registeredDate: '2023-01-15',
-    };
-    updateOwnerProfile(demoOwner);
-    setIsOwnerAuthenticated(true);
-    showNotification(`Logged in as ${ownerName} (${ownerEmail})`, 'success');
-  };
-
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-3 sm:p-6 animate-fade-in">
-      <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <div className="w-full max-w-xl mx-auto space-y-4 animate-fade-in py-4">
+      {/* Top Portal Switcher Bar: Explicit Separation between Pet Parent vs Clinic Staff */}
+      <div className="bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 shadow-xs">
+        <div className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-500 text-white font-bold text-xs shadow-xs">
+          <Heart className="w-4 h-4 fill-white" />
+          <span>🐾 Pet Parent / Owner Portal</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentSection('admin');
+            setUserRole('admin');
+          }}
+          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 font-semibold text-xs transition-all"
+        >
+          <Stethoscope className="w-4 h-4 text-teal-600" />
+          <span>🩺 Staff & Doctor Portal →</span>
+        </button>
+      </div>
+
+      <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Top Gradient Banner */}
         <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-6 text-white text-center relative">
           <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl mx-auto flex items-center justify-center mb-3 shadow-inner">
             <Heart className="w-7 h-7 text-white fill-white" />
           </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-black/20 text-amber-100 text-[10px] font-bold uppercase tracking-wider mb-1">
+            Dedicated Pet Guardian Gateway
+          </div>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight">Pet Parent & Companion Portal</h2>
-          <p className="text-amber-100 text-xs sm:text-sm mt-1">
-            Access lifetime health records, vaccination tracking, companion registration, and appointment booking.
+          <p className="text-amber-100 text-xs sm:text-sm mt-1 max-w-md mx-auto">
+            Manage your pet's lifetime health cards, vaccination reminders, digital passports, and veterinary appointments.
           </p>
 
           {/* Connected Firebase Badge */}
           <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-700/80 text-[11px] font-semibold border border-amber-400/40">
             <ShieldCheck className="w-3.5 h-3.5 text-amber-200" />
-            <span>Google Firebase Authentication & Cloud Storage Enabled</span>
+            <span>Secure Pet Records & Firebase Cloud Sync</span>
           </div>
         </div>
 
@@ -303,13 +333,14 @@ export const OwnerAuth: React.FC = () => {
               setAuthMode('login');
               setErrorMessage(null);
             }}
-            className={`py-3.5 text-center transition-all ${
+            className={`py-3.5 text-center transition-all flex items-center justify-center gap-2 ${
               authMode === 'login'
                 ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 border-b-2 border-amber-500'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
             }`}
           >
-            Sign In to Account
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>Pet Parent Sign In</span>
           </button>
           <button
             type="button"
@@ -317,13 +348,14 @@ export const OwnerAuth: React.FC = () => {
               setAuthMode('signup');
               setErrorMessage(null);
             }}
-            className={`py-3.5 text-center transition-all ${
+            className={`py-3.5 text-center transition-all flex items-center justify-center gap-2 ${
               authMode === 'signup'
                 ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 border-b-2 border-amber-500'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
             }`}
           >
-            New Pet Parent Registration
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>New Pet Parent Registration</span>
           </button>
         </div>
 
@@ -366,21 +398,32 @@ export const OwnerAuth: React.FC = () => {
               <span>Continue Directly with Google</span>
             </button>
 
+            {/* Quick Demo Access Button */}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleDemoPetParentLogin}
+              className="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-600" />
+              <span>Instant Demo Access as Pet Parent (Eleanor Vance)</span>
+            </button>
+
             <div className="relative flex py-2 items-center">
               <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
               <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Or with Email & Password
+                Or with Pet Parent Credentials
               </span>
               <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
             </div>
           </div>
 
-          {/* LOGIN FORM */}
+          {/* ================= LOGIN FORM ================= */}
           {authMode === 'login' && (
             <form onSubmit={handleEmailLogin} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Email Address
+                  Pet Parent Registered Email
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -389,15 +432,15 @@ export const OwnerAuth: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. ajitkp191@gmail.com"
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    placeholder="e.g. petowner@example.com"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Password
+                  Account Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -407,7 +450,7 @@ export const OwnerAuth: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -426,58 +469,16 @@ export const OwnerAuth: React.FC = () => {
                   </>
                 )}
               </button>
-
-              {/* Quick One-Click Demo Profiles */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                <span className="text-[11px] font-bold text-slate-400 block">
-                  Demo Pet Owner Profiles (Instant Switch):
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleQuickDemoLogin(
-                        'Ajit Kumar',
-                        'ajitkp191@gmail.com',
-                        '+1 (555) 234-5678',
-                        '742 Evergreen Terrace, Metro City'
-                      )
-                    }
-                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-left hover:border-amber-400 transition-colors flex items-center gap-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-[11px]">Ajit Kumar</div>
-                      <div className="text-[10px] text-slate-500">ajitkp191@gmail.com (Max & Luna)</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleQuickDemoLogin(
-                        'Marcus Vance',
-                        'marcus.v@example.com',
-                        '+1 (555) 890-1234',
-                        '12 Oak Ridge Lane, Metro City'
-                      )
-                    }
-                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-left hover:border-amber-400 transition-colors flex items-center gap-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-[11px]">Marcus Vance</div>
-                      <div className="text-[10px] text-slate-500">marcus.v@example.com (Bella)</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
             </form>
           )}
 
-          {/* SIGNUP FORM */}
+          {/* ================= SIGNUP FORM ================= */}
           {authMode === 'signup' && (
             <form onSubmit={handleOwnerSignup} className="space-y-4 text-xs">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs">
+                ✨ Create your personal pet parent account to keep digital medical records, track vaccination schedules, and receive emergency triage support.
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -490,8 +491,8 @@ export const OwnerAuth: React.FC = () => {
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Ajit Kumar"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      placeholder="e.g. Jane Doe"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -507,8 +508,8 @@ export const OwnerAuth: React.FC = () => {
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+1 (555) 234-5678"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -526,8 +527,8 @@ export const OwnerAuth: React.FC = () => {
                       required
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
-                      placeholder="e.g. ajitkp191@gmail.com"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      placeholder="e.g. name@example.com"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -544,7 +545,7 @@ export const OwnerAuth: React.FC = () => {
                       value={signupPassword}
                       onChange={(e) => setSignupPassword(e.target.value)}
                       placeholder="Min 6 characters"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -564,7 +565,7 @@ export const OwnerAuth: React.FC = () => {
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="742 Evergreen Terrace, Metro City"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -580,7 +581,7 @@ export const OwnerAuth: React.FC = () => {
                       value={emergencyContact}
                       onChange={(e) => setEmergencyContact(e.target.value)}
                       placeholder="+1 (555) 987-6543 (Sibling / Neighbor)"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -616,8 +617,8 @@ export const OwnerAuth: React.FC = () => {
                           required
                           value={petName}
                           onChange={(e) => setPetName(e.target.value)}
-                          placeholder="e.g. Max"
-                          className="w-full px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 font-semibold"
+                          placeholder="e.g. Companion Name"
+                          className="w-full px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 font-semibold text-slate-900 dark:text-white"
                         />
                       </div>
 
@@ -628,7 +629,7 @@ export const OwnerAuth: React.FC = () => {
                         <select
                           value={petSpecies}
                           onChange={(e) => setPetSpecies(e.target.value as SpeciesType)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 font-semibold"
+                          className="w-full px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 font-semibold text-slate-900 dark:text-white"
                         >
                           <option value="Canine (Dog)">Canine (Dog)</option>
                           <option value="Feline (Cat)">Feline (Cat)</option>
@@ -650,7 +651,7 @@ export const OwnerAuth: React.FC = () => {
                           value={petBreed}
                           onChange={(e) => setPetBreed(e.target.value)}
                           placeholder="e.g. Golden Retriever"
-                          className="w-full px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900"
+                          className="w-full px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                         />
                       </div>
                     </div>
@@ -686,13 +687,27 @@ export const OwnerAuth: React.FC = () => {
                   <span>Registering Account & Companion...</span>
                 ) : (
                   <>
-                    <span>Complete Signup & Enter Portal</span>
+                    <span>Complete Signup & Enter Pet Portal</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
             </form>
           )}
+
+          {/* Bottom Switcher Link */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentSection('admin');
+                setUserRole('admin');
+              }}
+              className="text-xs text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 font-medium transition-colors"
+            >
+              Are you a Veterinarian, Clinic Admin, or Hospital Staff? <strong className="text-teal-600 dark:text-teal-400 underline">Switch to Professional Staff Portal →</strong>
+            </button>
+          </div>
         </div>
       </div>
     </div>

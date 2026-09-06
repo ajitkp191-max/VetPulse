@@ -32,6 +32,7 @@ import { generateAnimalRegistrationNumber } from '../../utils/petRegistration';
 
 export const PatientManagement: React.FC = () => {
   const {
+    currentSection,
     pets,
     addPet,
     updatePet,
@@ -49,11 +50,37 @@ export const PatientManagement: React.FC = () => {
     showNotification,
   } = useApp();
 
+  const isSuperAdmin = currentSection === 'super_admin';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [speciesFilter, setSpeciesFilter] = useState<string>('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [petToDelete, setPetToDelete] = useState<PetRecord | null>(null);
+  const [petToEdit, setPetToEdit] = useState<PetRecord | null>(null);
+  const [editWeight, setEditWeight] = useState<number | string>('');
+  const [editAge, setEditAge] = useState('');
+  const [editBreed, setEditBreed] = useState('');
   const [activeHistoryTab, setActiveHistoryTab] = useState<'overview' | 'consultations' | 'labs' | 'imaging' | 'ecg' | 'vaccines' | 'deworming' | 'prescriptions' | 'documents'>('overview');
+
+  const handleOpenEditPet = (pet: PetRecord) => {
+    setPetToEdit(pet);
+    setEditWeight(pet.weight);
+    setEditAge(pet.age);
+    setEditBreed(pet.breed);
+  };
+
+  const handleSavePetEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!petToEdit) return;
+    const parsedWeight = parseFloat(String(editWeight));
+    updatePet(petToEdit.id, {
+      weight: !isNaN(parsedWeight) && parsedWeight > 0 ? parsedWeight : petToEdit.weight,
+      age: editAge.trim() || petToEdit.age,
+      breed: editBreed.trim() || petToEdit.breed,
+    });
+    showNotification(`Doctor updated ${petToEdit.name}'s weight (${editWeight} kg) & age (${editAge})`, 'success');
+    setPetToEdit(null);
+  };
 
   // New Pet Form State
   const [newPet, setNewPet] = useState({
@@ -80,11 +107,12 @@ export const PatientManagement: React.FC = () => {
   });
 
   const filteredPets = pets.filter((pet) => {
+    const term = (searchTerm || '').toLowerCase();
     const matchesSearch =
-      pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pet.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pet.identificationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pet.breed.toLowerCase().includes(searchTerm.toLowerCase());
+      (pet.name || '').toLowerCase().includes(term) ||
+      (pet.ownerName || '').toLowerCase().includes(term) ||
+      (pet.identificationNumber || '').toLowerCase().includes(term) ||
+      (pet.breed || '').toLowerCase().includes(term);
     const matchesSpecies = speciesFilter === 'All' || pet.species === speciesFilter;
     return matchesSearch && matchesSpecies;
   });
@@ -219,11 +247,17 @@ export const PatientManagement: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={pet.photo}
-                      alt={pet.name}
-                      className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                    />
+                    {pet.photo && pet.photo.trim() !== '' ? (
+                      <img
+                        src={pet.photo}
+                        alt={pet.name}
+                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0 border border-slate-200 dark:border-slate-700">
+                        <AnimalIllustration species={pet.species} className="w-6 h-6" />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">
@@ -244,12 +278,20 @@ export const PatientManagement: React.FC = () => {
 
                   <div className="flex items-center gap-1 shrink-0">
                     <button
-                      title="Admin: Delete Pet Record"
+                      title={isSuperAdmin ? "Super Admin: Delete Pet Record" : "Deletion restricted to Super Admin"}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (!isSuperAdmin) {
+                          showNotification('🔒 Restricted: Doctor & Clinic Manager cannot delete registered pets. Only Super Admin has deletion rights.', 'error');
+                          return;
+                        }
                         setPetToDelete(pet);
                       }}
-                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-all opacity-80 group-hover:opacity-100"
+                      className={`p-1.5 rounded-lg transition-all ${
+                        isSuperAdmin
+                          ? 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 opacity-80 group-hover:opacity-100'
+                          : 'text-slate-300 dark:text-slate-600 hover:text-amber-500'
+                      }`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -268,11 +310,17 @@ export const PatientManagement: React.FC = () => {
             <div className="p-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white relative">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <img
-                    src={currentPet.photo}
-                    alt={currentPet.name}
-                    className="w-20 h-20 rounded-2xl object-cover border-2 border-teal-400 shadow-md shrink-0"
-                  />
+                  {currentPet.photo && currentPet.photo.trim() !== '' ? (
+                    <img
+                      src={currentPet.photo}
+                      alt={currentPet.name}
+                      className="w-20 h-20 rounded-2xl object-cover border-2 border-teal-400 shadow-md shrink-0"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-2xl border-2 border-teal-400 shadow-md shrink-0 flex items-center justify-center bg-slate-800 text-teal-300">
+                      <AnimalIllustration species={currentPet.species} className="w-10 h-10" />
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-extrabold tracking-tight">{currentPet.name}</h3>
@@ -288,24 +336,66 @@ export const PatientManagement: React.FC = () => {
                 </div>
 
                 {/* Quick Dossier Actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => handleOpenEditPet(currentPet)}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                    title="Doctor Edit Body Weight and Age"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Edit Weight & Age</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectedPetId(currentPet.id);
+                      setAdminActiveTab('history-taking');
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Take History</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setSelectedPetId(currentPet.id);
                       setAdminActiveTab('consultation');
                     }}
-                    className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5"
+                    className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
                   >
                     <Stethoscope className="w-3.5 h-3.5" />
-                    <span>Start Consultation</span>
+                    <span>Clinical Consultation</span>
                   </button>
+
                   <button
-                    title="Admin Right: Delete Registered Pet Record"
-                    onClick={() => setPetToDelete(currentPet)}
-                    className="p-2 text-red-300 hover:text-red-100 rounded-xl hover:bg-red-500/20 transition-colors flex items-center gap-1 text-xs border border-red-500/30"
+                    onClick={() => {
+                      setSelectedPetId(currentPet.id);
+                      setAdminActiveTab('prescription');
+                    }}
+                    className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Write / Upload Rx</span>
+                  </button>
+
+                  <button
+                    title={isSuperAdmin ? "Super Admin: Delete Registered Pet Record" : "Deletion restricted to Super Admin"}
+                    onClick={() => {
+                      if (!isSuperAdmin) {
+                        showNotification('🔒 Restricted: Doctor & Clinic Manager cannot delete registered pets. Only Super Admin has deletion rights.', 'error');
+                        return;
+                      }
+                      setPetToDelete(currentPet);
+                    }}
+                    className={`p-2 rounded-xl transition-colors flex items-center gap-1 text-xs border ${
+                      isSuperAdmin
+                        ? 'text-red-300 hover:text-red-100 hover:bg-red-500/20 border-red-500/30'
+                        : 'text-slate-400 border-slate-700 hover:bg-slate-800'
+                    }`}
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span className="hidden sm:inline font-semibold">Delete Pet</span>
+                    <span className="hidden sm:inline font-semibold">{isSuperAdmin ? 'Delete Pet' : 'Delete (Restricted)'}</span>
                   </button>
                 </div>
               </div>
@@ -356,7 +446,7 @@ export const PatientManagement: React.FC = () => {
                       <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                         <span className="text-slate-400">Body Weight</span>
                         <div className="font-bold text-slate-900 dark:text-white mt-0.5">{currentPet.weight} kg</div>
-                        <span className="text-[10px] text-slate-400">{(currentPet.weight * 2.20462).toFixed(1)} lbs</span>
+                        <span className="text-[10px] text-slate-400">{((Number(currentPet?.weight) || 0) * 2.20462).toFixed(1)} lbs</span>
                       </div>
                       <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                         <span className="text-slate-400">Coat Color / Marking</span>
@@ -513,11 +603,17 @@ export const PatientManagement: React.FC = () => {
                   ) : (
                     petImaging.map((img) => (
                       <div key={img.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col sm:flex-row gap-4">
-                        <img
-                          src={img.imageUrl}
-                          alt={img.modality}
-                          className="w-full sm:w-44 h-36 rounded-xl object-cover border border-slate-300 dark:border-slate-700 shrink-0"
-                        />
+                        {img.imageUrl && img.imageUrl.trim() !== '' ? (
+                          <img
+                            src={img.imageUrl}
+                            alt={img.modality}
+                            className="w-full sm:w-44 h-36 rounded-xl object-cover border border-slate-300 dark:border-slate-700 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-full sm:w-44 h-36 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-teal-400 font-mono text-xs shrink-0">
+                            {img.modality}
+                          </div>
+                        )}
                         <div className="space-y-1.5 flex-1 text-xs">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-teal-700 dark:text-teal-300">{img.modality}</span>
@@ -525,9 +621,15 @@ export const PatientManagement: React.FC = () => {
                           </div>
                           <p className="font-semibold text-slate-900 dark:text-white">Region: {img.anatomicalRegion}</p>
                           <div className="text-slate-600 dark:text-slate-300 space-y-0.5">
-                            {img.findings.map((f, i) => (
-                              <p key={i}>• {f}</p>
-                            ))}
+                            {Array.isArray(img.findings) ? (
+                              img.findings.map((f, i) => (
+                                <p key={i}>• {f}</p>
+                              ))
+                            ) : img.findings ? (
+                              <p>• {String(img.findings)}</p>
+                            ) : (
+                              <p className="text-slate-400 italic">No specific findings logged.</p>
+                            )}
                           </div>
                           <p className="text-emerald-600 dark:text-emerald-400 font-medium">
                             <strong>Interpretation:</strong> {img.interpretation}
@@ -819,7 +921,7 @@ export const PatientManagement: React.FC = () => {
                       required
                       value={newPet.ownerName}
                       onChange={(e) => setNewPet({ ...newPet, ownerName: e.target.value })}
-                      placeholder="Ajit Kumar"
+                      placeholder="Pet Owner Name"
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                     />
                   </div>
@@ -830,7 +932,7 @@ export const PatientManagement: React.FC = () => {
                       required
                       value={newPet.ownerPhone}
                       onChange={(e) => setNewPet({ ...newPet, ownerPhone: e.target.value })}
-                      placeholder="+1 (555) 234-5678"
+                      placeholder="+1 (555) 000-0000"
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                     />
                   </div>
@@ -865,7 +967,13 @@ export const PatientManagement: React.FC = () => {
                   Animal Photograph
                 </label>
                 <div className="flex items-center gap-3">
-                  <img src={newPet.photo} alt="Preview" className="w-12 h-12 rounded-xl object-cover border" />
+                  {newPet.photo && newPet.photo.trim() !== '' ? (
+                    <img src={newPet.photo} alt="Preview" className="w-12 h-12 rounded-xl object-cover border" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl border border-dashed flex items-center justify-center text-slate-400 text-[9px] bg-slate-50 dark:bg-slate-800">
+                      No Photo
+                    </div>
+                  )}
                   <input
                     type="file"
                     accept="image/*"
@@ -912,11 +1020,17 @@ export const PatientManagement: React.FC = () => {
 
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
               <div className="flex items-center gap-3">
-                <img
-                  src={petToDelete.photo}
-                  alt={petToDelete.name}
-                  className="w-12 h-12 rounded-xl object-cover border shrink-0"
-                />
+                {petToDelete.photo && petToDelete.photo.trim() !== '' ? (
+                  <img
+                    src={petToDelete.photo}
+                    alt={petToDelete.name}
+                    className="w-12 h-12 rounded-xl object-cover border shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-red-500 shrink-0 border border-slate-200 dark:border-slate-700">
+                    <AnimalIllustration species={petToDelete.species} className="w-6 h-6" />
+                  </div>
+                )}
                 <div>
                   <div className="font-bold text-slate-900 dark:text-white text-sm">
                     {petToDelete.name}
@@ -959,6 +1073,103 @@ export const PatientManagement: React.FC = () => {
                 <span>Permanently Delete Pet</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Doctor Edit Pet Weight & Age Modal */}
+      {petToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-teal-100 dark:bg-teal-950/70 text-teal-700 dark:text-teal-300 rounded-2xl">
+                  <Stethoscope className="w-5 h-5 text-teal-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Update Clinical Vitals: {petToEdit.name}
+                  </h3>
+                  <p className="text-xs text-slate-500">Doctor / Veterinary Station Edit</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPetToEdit(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePetEdit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Measured Body Weight (kg) *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.1"
+                      max="200"
+                      required
+                      value={editWeight}
+                      onChange={(e) => setEditWeight(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                    />
+                    <span className="absolute right-3 top-2 text-xs text-slate-400 font-semibold">kg</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Patient Age *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 3 Years 2 Months"
+                    value={editAge}
+                    onChange={(e) => setEditAge(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Breed Specifier
+                </label>
+                <input
+                  type="text"
+                  value={editBreed}
+                  onChange={(e) => setEditBreed(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              <div className="p-3 bg-teal-50/70 dark:bg-teal-950/30 rounded-xl border border-teal-200/60 dark:border-teal-900/40 text-[11px] text-teal-800 dark:text-teal-300">
+                🩺 Updating body weight immediately calibrates milligram-per-kilogram dosage calculations for all subsequent prescriptions and fluid therapy rates.
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPetToEdit(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-all flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Update Patient Vitals</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

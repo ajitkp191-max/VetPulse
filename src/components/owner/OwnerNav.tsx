@@ -7,13 +7,25 @@ import {
   Home,
   LogOut,
   User,
+  Award,
+  Sparkles,
+  FileText,
+  ShieldCheck,
+  Activity,
+  Bell,
 } from 'lucide-react';
 
 export const OWNER_NAV_ITEMS = [
   { id: 'dashboard', label: 'Pet Home', icon: Home },
   { id: 'my-pets', label: 'My Companions', icon: Heart },
   { id: 'book-appointment', label: 'Book Vet Visit', icon: Calendar },
-  { id: 'emergency-first-aid', label: 'First Aid & Poison', icon: AlertOctagon },
+  { id: 'prescriptions', label: 'Prescriptions (Rx)', icon: FileText },
+  { id: 'medical-records', label: 'Medical Records', icon: Activity },
+  { id: 'vaccine-tracker', label: 'Vaccines & Parasite', icon: ShieldCheck },
+  { id: 'notifications', label: 'Alerts & Reminders', icon: Bell },
+  { id: 'passport', label: 'Passport', icon: Award },
+  { id: 'symptom-checker', label: 'AI Triage', icon: Sparkles },
+  { id: 'emergency-first-aid', label: 'First Aid', icon: AlertOctagon },
 ];
 
 export const OwnerNav: React.FC = () => {
@@ -21,14 +33,8 @@ export const OwnerNav: React.FC = () => {
     ownerActiveTab,
     setOwnerActiveTab,
     ownerProfile,
-    setIsOwnerAuthenticated,
-    showNotification,
+    logout,
   } = useApp();
-
-  const handleLogout = () => {
-    setIsOwnerAuthenticated(false);
-    showNotification('Signed out from pet guardian portal', 'info');
-  };
 
   return (
     <>
@@ -59,11 +65,17 @@ export const OwnerNav: React.FC = () => {
 
             {/* Owner Profile / Logout Button */}
             <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                {ownerProfile?.photoURL ? (
+              <button
+                onClick={() => setOwnerActiveTab('owner-profile')}
+                className={`flex items-center gap-2 p-1 rounded-xl transition-all ${
+                  ownerActiveTab === 'owner-profile' ? 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950/40' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="View & Edit Owner Profile"
+              >
+                {ownerProfile?.photoURL && ownerProfile.photoURL.trim() !== '' ? (
                   <img
                     src={ownerProfile.photoURL}
-                    alt={ownerProfile.name}
+                    alt={ownerProfile.name || 'Pet Parent'}
                     className="w-7 h-7 rounded-full object-cover border border-amber-300 dark:border-amber-700"
                   />
                 ) : (
@@ -79,22 +91,24 @@ export const OwnerNav: React.FC = () => {
                     {ownerProfile?.email || 'owner@portal'}
                   </div>
                 </div>
-              </div>
+              </button>
 
               <button
-                onClick={handleLogout}
+                id="owner-nav-btn-logout"
+                onClick={logout}
                 title="Sign out of Owner Portal"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 border border-rose-200 dark:border-rose-800/80 transition-all shadow-2xs group"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                <span className="hidden xl:inline">Sign Out</span>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation Bar (Android style) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around">
+      {/* Mobile Bottom Navigation Bar (Android style - horizontal scrollable) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center overflow-x-auto gap-1">
         {OWNER_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = ownerActiveTab === item.id;
@@ -102,17 +116,28 @@ export const OwnerNav: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setOwnerActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
+              className={`flex flex-col items-center justify-center min-w-[62px] py-1 px-1 rounded-xl transition-all shrink-0 ${
                 isActive
-                  ? 'text-amber-600 dark:text-amber-400 font-bold'
+                  ? 'text-amber-600 dark:text-amber-400 font-bold bg-amber-50/50 dark:bg-amber-950/30'
                   : 'text-slate-500 dark:text-slate-400'
               }`}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="w-4 h-4" />
               <span className="text-[9px] mt-0.5 whitespace-nowrap">{item.label}</span>
             </button>
           );
         })}
+        <button
+          onClick={() => setOwnerActiveTab('owner-profile')}
+          className={`flex flex-col items-center justify-center min-w-[62px] py-1 px-1 rounded-xl transition-all shrink-0 ${
+            ownerActiveTab === 'owner-profile'
+              ? 'text-amber-600 dark:text-amber-400 font-bold bg-amber-50/50 dark:bg-amber-950/30'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span className="text-[9px] mt-0.5 whitespace-nowrap">Profile</span>
+        </button>
       </div>
     </>
   );
