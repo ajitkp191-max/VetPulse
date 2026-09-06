@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
+import { GlobalNavigationBar } from './components/common/GlobalNavigationBar';
+import { MobileBottomNavBar } from './components/common/MobileBottomNavBar';
 import { NotificationToast } from './components/common/NotificationToast';
+import { AppLoadingScreen } from './components/common/AppLoadingScreen';
+import { WelcomeLandingPage } from './components/common/WelcomeLandingPage';
 
 // Admin Components
 import { AdminAuth } from './components/admin/AdminAuth';
@@ -58,6 +62,35 @@ const MainAppContent: React.FC = () => {
     setOwnerActiveTab,
     isAndroidFrameMode,
   } = useApp();
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [showWelcome, setShowWelcome] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Initial app bootstrap timer to display the high-fidelity animated loading experience
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return <AppLoadingScreen onFinish={() => setIsLoading(false)} />;
+  }
+
+  if (showWelcome) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col">
+        <Header />
+        <WelcomeLandingPage
+          onEnterWorkspace={() => setShowWelcome(false)}
+          onSelectRole={() => setShowWelcome(false)}
+        />
+        <MobileBottomNavBar />
+        <NotificationToast />
+      </div>
+    );
+  }
 
   const renderAdminContent = () => {
     if (!isAdminAuthenticated) {
@@ -184,11 +217,13 @@ const MainAppContent: React.FC = () => {
   };
 
   const content = (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-teal-500 selection:text-white pb-16 md:pb-0">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-teal-500 selection:text-white pb-16 md:pb-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <Header />
+      <GlobalNavigationBar />
       <NotificationToast />
       {renderSectionView()}
       <PetQuickSearchModal />
+      <MobileBottomNavBar />
     </div>
   );
 

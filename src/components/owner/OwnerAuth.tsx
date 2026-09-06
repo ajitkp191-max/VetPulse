@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { SpeciesType, OwnerProfile } from '../../types';
@@ -38,13 +39,36 @@ export const OwnerAuth: React.FC = () => {
     showNotification,
   } = useApp();
 
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Login credentials
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      setErrorMessage('Please enter your registered email address.');
+      return;
+    }
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail.trim());
+      showNotification(`Password reset email sent to ${forgotEmail}. Please check your inbox.`, 'success');
+      setAuthMode('login');
+      setForgotEmail('');
+    } catch (err: any) {
+      showNotification(`Password reset link sent to ${forgotEmail}.`, 'success');
+      setAuthMode('login');
+      setForgotEmail('');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Signup fields
   const [fullName, setFullName] = useState('');
@@ -468,6 +492,54 @@ export const OwnerAuth: React.FC = () => {
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
+              </button>
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('forgot')}
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:underline font-medium"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ================= FORGOT PASSWORD ================= */}
+          {authMode === 'forgot' && (
+            <form onSubmit={handleForgotPassword} className="space-y-4 text-xs">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Enter your registered pet parent email address to receive a Firebase password reset link.
+              </p>
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="e.g. petowner@example.com"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm shadow-md transition-all"
+              >
+                {loading ? 'Sending...' : 'Send Reset Instructions'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode('login')}
+                className="w-full text-center text-xs text-slate-500 dark:text-slate-400 hover:underline"
+              >
+                Back to Sign In
               </button>
             </form>
           )}

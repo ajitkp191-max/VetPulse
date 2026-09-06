@@ -7,18 +7,13 @@ import {
   HeartHandshake,
   Sun,
   Moon,
-  Smartphone,
-  AlertOctagon,
   LogOut,
-  Search,
-  Command,
   ChevronDown,
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
 import { AdminGlobalSearch } from '../admin/AdminGlobalSearch';
-import { AndroidApkReleaseModal } from './AndroidApkReleaseModal';
-import { AppDownloadButton } from './AppDownloadButton';
+
 
 export const Header: React.FC = () => {
   const {
@@ -33,21 +28,16 @@ export const Header: React.FC = () => {
     setIsOwnerAuthenticated,
     isDarkMode,
     setIsDarkMode,
-    isAndroidFrameMode,
-    setIsAndroidFrameMode,
     adminProfile,
     ownerProfile,
     selectedPet,
-    setOwnerActiveTab,
     isAdminSearchOpen,
     setIsAdminSearchOpen,
-    setIsPetSearchOpen,
     logout,
     showNotification,
   } = useApp();
 
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
 
   const getRoleConfig = () => {
     switch (currentSection) {
@@ -111,47 +101,6 @@ export const Header: React.FC = () => {
 
         {/* Action Controls & Navigation Toggles */}
         <div className="flex items-center gap-1.5 sm:gap-2.5">
-          {/* Universal Pet Search Button - Strictly restricted to Doctor and Super Admin only */}
-          {currentSection !== 'owner' && (
-            <button
-              id="header-universal-pet-search-btn"
-              onClick={() => setIsPetSearchOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/80 dark:hover:bg-teal-900 text-teal-800 dark:text-teal-200 text-xs font-bold transition-all shadow-2xs group"
-              title="Search Pet by Name or Registration Number (Doctor & Super Admin)"
-            >
-              <Search className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">Search Pet 🔍</span>
-              <span className="sm:hidden">Pet 🔍</span>
-            </button>
-          )}
-
-          {/* Admin / Doctor Global Search Button */}
-          {(currentSection === 'admin' || currentSection === 'doctor') && isAdminAuthenticated && (
-            <>
-              <button
-                onClick={() => setIsAdminSearchOpen(true)}
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-500 dark:text-slate-400 text-xs transition-all shadow-2xs group"
-                title="Global Clinical Search (Ctrl+K or Cmd+K)"
-              >
-                <Search className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
-                <span className="font-medium text-slate-600 dark:text-slate-300">
-                  Search patients, Rx, records...
-                </span>
-                <span className="flex items-center gap-0.5 text-[10px] font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-slate-400 dark:text-slate-400">
-                  <Command className="w-2.5 h-2.5" />K
-                </span>
-              </button>
-
-              <button
-                onClick={() => setIsAdminSearchOpen(true)}
-                className="md:hidden p-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-100 transition-colors"
-                title="Search"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </>
-          )}
-
           {/* 4-Level Role Mode Switcher */}
           <div className="relative">
             <button
@@ -251,41 +200,13 @@ export const Header: React.FC = () => {
             )}
           </div>
 
-          {/* Quick SOS Emergency Trigger Button */}
-          <button
-            onClick={() => {
-              if (currentSection !== 'owner') setCurrentSection('owner');
-              setOwnerActiveTab('emergency-first-aid');
-              showNotification('Emergency SOS Activated — Showing immediate triage & contacts', 'error');
-            }}
-            title="Emergency SOS"
-            className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-xl shadow-xs transition-all animate-pulse-subtle"
-          >
-            <AlertOctagon className="w-4 h-4" />
-            <span className="hidden sm:inline">SOS Emergency</span>
-          </button>
 
-          {/* One-Tap Automatic Download Button (Device-Aware) */}
-          <AppDownloadButton onOpenModal={() => setIsApkModalOpen(true)} />
-
-          {/* Android Mobile Frame Simulation Toggle */}
-          <button
-            onClick={() => setIsAndroidFrameMode((prev) => !prev)}
-            title={isAndroidFrameMode ? "Switch to Desktop Responsive View" : "Simulate Android Mobile App View"}
-            className={`p-2 rounded-xl text-xs border transition-colors ${
-              isAndroidFrameMode
-                ? 'bg-teal-50 border-teal-300 text-teal-700 dark:bg-teal-950 dark:border-teal-700 dark:text-teal-300'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-            }`}
-          >
-            <Smartphone className="w-4 h-4" />
-          </button>
 
           {/* Dark / Light Mode Toggle */}
           <button
             onClick={() => setIsDarkMode((prev) => !prev)}
             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>
@@ -317,11 +238,7 @@ export const Header: React.FC = () => {
         />
       )}
 
-      {/* Android App & APK Release Modal */}
-      <AndroidApkReleaseModal
-        isOpen={isApkModalOpen}
-        onClose={() => setIsApkModalOpen(false)}
-      />
+
     </header>
   );
 };

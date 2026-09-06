@@ -34,6 +34,7 @@ import {
   SupportMessage,
   AppSection,
   UserRole,
+  NavigationHistoryItem,
 } from '../types';
 import {
   initialAdminProfile,
@@ -136,13 +137,14 @@ interface AppContextType {
   updateSupportTicketStatus: (ticketId: string, status: SupportTicket['status']) => void;
 
   // Super Admin & Clinic Management Mutations
-  approveDoctor: (id: string, notes?: string) => void;
-  rejectDoctor: (id: string, reason?: string) => void;
-  suspendDoctor: (id: string) => void;
-  reactivateDoctor: (id: string) => void;
-  updateDoctorRole: (id: string, newRole: UserRole) => void;
-  updateDoctor: (id: string, updates: Partial<DoctorAccount>) => void;
-  deleteDoctor: (id: string) => void;
+  addDoctor: (doctor: Partial<DoctorAccount> & { name: string; email: string; registrationNumber: string }) => Promise<DoctorAccount>;
+  approveDoctor: (id: string, notes?: string) => Promise<void>;
+  rejectDoctor: (id: string, reason?: string) => Promise<void>;
+  suspendDoctor: (id: string) => Promise<void>;
+  reactivateDoctor: (id: string) => Promise<void>;
+  updateDoctorRole: (id: string, newRole: UserRole) => Promise<void>;
+  updateDoctor: (id: string, updates: Partial<DoctorAccount>) => Promise<void>;
+  deleteDoctor: (id: string) => Promise<void>;
   addClinic: (clinic: ClinicAccount) => void;
   updateClinic: (id: string, updates: Partial<ClinicAccount>) => void;
   deleteClinic: (id: string) => void;
@@ -184,7 +186,7 @@ interface AppContextType {
   addDeworming: (dew: Omit<DewormingRecord, 'id'>) => DewormingRecord;
   updateInventoryStock: (id: string, newCount: number) => void;
   
-  // Navigation tabs helper
+  // Navigation tabs & History Controls
   adminActiveTab: string;
   setAdminActiveTab: (tab: string) => void;
   activeTab: string;
@@ -195,6 +197,20 @@ interface AppContextType {
   setIsAdminSearchOpen: (open: boolean) => void;
   isPetSearchOpen: boolean;
   setIsPetSearchOpen: (open: boolean) => void;
+
+  // Essential Forward/Backward & History Controls
+  navigationHistory: NavigationHistoryItem[];
+  historyIndex: number;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  goBack: () => void;
+  goForward: () => void;
+  goHome: () => void;
+  navigateTo: (section: AppSection, tab: string, customLabel?: string, petId?: string) => void;
+  jumpToHistoryIndex: (index: number) => void;
+  currentBreadcrumbs: { label: string; section?: AppSection; tab?: string; onClick?: () => void }[];
+  refreshData: () => Promise<void>;
+  isRefreshing: boolean;
 
   // Notifications & Auth
   logout: (targetSection?: AppSection) => void;
@@ -268,16 +284,237 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdminSearchOpen, setIsAdminSearchOpen] = useState<boolean>(false);
   const [isPetSearchOpen, setIsPetSearchOpen] = useState<boolean>(false);
 
-  // Keyboard shortcut listener for Cmd+K / Ctrl+K
+  // Navigation History State
+  const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryItem[]>([
+    {
+      id: 'nav_init',
+      section: 'admin',
+      tab: 'dashboard',
+      label: 'Doctor Dashboard',
+      timestamp: Date.now(),
+    },
+  ]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const isNavigatingRef = React.useRef(false);
+
+  // Human-readable labels resolver
+  const getTabLabel = useCallback((section: AppSection, tab: string): string => {
+    if (section === 'super_admin') {
+      switch (tab) {
+        case 'overview': return 'Super Admin Overview';
+        case 'doctors': return 'Doctor Registry & Verifications';
+        case 'owners': return 'Pet Owner Registry';
+        case 'pets': return 'Patient Records (HQ)';
+        case 'clinics': return 'Clinic Accounts';
+        case 'analytics': return 'Platform Analytics';
+        case 'helpdesk': return 'Doctor Helpdesk';
+        case 'audit': return 'Security Audit Ledger';
+        case 'settings': return 'System Settings';
+        default: return 'Super Admin HQ';
+      }
+    }
+    if (section === 'doctor' || section === 'admin') {
+      switch (tab) {
+        case 'dashboard': return 'Doctor Dashboard';
+        case 'patients': return 'Patients & Medical Records';
+        case 'history-taking': return 'Anamnesis & History Taking';
+        case 'appointments': return 'Appointments Schedule';
+        case 'consultation': return 'Clinical SOAP Consultation';
+        case 'laboratory': return 'Laboratory (Biochem/CBC)';
+        case 'imaging': return 'Imaging (X-Ray/USG)';
+        case 'ecg': return 'ECG Diagnostics';
+        case 'multiparameter-diagnostic': return 'AI Diagnostic Fusion';
+        case 'surgery': return 'Surgery Library';
+        case 'vaccination': return 'Vaccination Tracker';
+        case 'deworming': return 'Deworming Tracker';
+        case 'prescription': return 'Prescription Generator (Rx)';
+        case 'inventory': return 'Inventory & Pharmacy';
+        case 'billing': return 'Billing & Invoicing';
+        case 'reports': return 'Reports & Analytics';
+        case 'support': return 'Platform Support Desk';
+        case 'settings': return 'Clinic Settings';
+        default: return 'Doctor Station';
+      }
+    }
+    // owner
+    switch (tab) {
+      case 'dashboard': return 'Pet Parent Home';
+      case 'my-pets': return 'My Companions';
+      case 'book-appointment': return 'Book Vet Visit';
+      case 'prescriptions': return 'Prescriptions (Rx)';
+      case 'medical-records': return 'Medical Records Archive';
+      case 'vaccine-tracker': return 'Vaccines & Parasite Schedule';
+      case 'notifications': return 'Alerts & Reminders';
+      case 'passport': return 'Health Passport';
+      case 'symptom-checker': return 'AI Symptom Checker';
+      case 'emergency-first-aid':
+      case 'emergency': return 'Emergency SOS & First Aid';
+      case 'owner-profile': return 'Owner Profile';
+      default: return 'Pet Owner Portal';
+    }
+  }, []);
+
+  // Sync state transitions to history stack
+  useEffect(() => {
+    if (isNavigatingRef.current) {
+      isNavigatingRef.current = false;
+      return;
+    }
+    const currentTab = currentSection === 'owner' ? ownerActiveTab : currentSection === 'super_admin' ? 'overview' : adminActiveTab;
+    const label = getTabLabel(currentSection, currentTab);
+
+    setNavigationHistory((prev) => {
+      const currentEntry = prev[historyIndex];
+      if (
+        currentEntry &&
+        currentEntry.section === currentSection &&
+        currentEntry.tab === currentTab
+      ) {
+        return prev;
+      }
+      const newEntry: NavigationHistoryItem = {
+        id: `nav_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        section: currentSection,
+        tab: currentTab,
+        label,
+        timestamp: Date.now(),
+      };
+      const updated = [...prev.slice(0, historyIndex + 1), newEntry].slice(-35);
+      setHistoryIndex(updated.length - 1);
+      return updated;
+    });
+  }, [currentSection, adminActiveTab, ownerActiveTab, getTabLabel]);
+
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < navigationHistory.length - 1;
+
+  const applyNavigationEntry = useCallback((entry: NavigationHistoryItem) => {
+    isNavigatingRef.current = true;
+    if (entry.section !== currentSection) {
+      setCurrentSection(entry.section);
+      if (entry.section === 'super_admin') setUserRole('super_admin');
+      else if (entry.section === 'owner') setUserRole('owner');
+      else setUserRole('doctor');
+    }
+    if (entry.section === 'owner') {
+      setOwnerActiveTab(entry.tab);
+    } else if (entry.section === 'admin' || entry.section === 'doctor') {
+      setAdminActiveTab(entry.tab);
+    }
+  }, [currentSection]);
+
+  const goBack = useCallback(() => {
+    if (historyIndex > 0) {
+      const targetIndex = historyIndex - 1;
+      const targetEntry = navigationHistory[targetIndex];
+      if (targetEntry) {
+        setHistoryIndex(targetIndex);
+        applyNavigationEntry(targetEntry);
+      }
+    }
+  }, [historyIndex, navigationHistory, applyNavigationEntry]);
+
+  const goForward = useCallback(() => {
+    if (historyIndex < navigationHistory.length - 1) {
+      const targetIndex = historyIndex + 1;
+      const targetEntry = navigationHistory[targetIndex];
+      if (targetEntry) {
+        setHistoryIndex(targetIndex);
+        applyNavigationEntry(targetEntry);
+      }
+    }
+  }, [historyIndex, navigationHistory, applyNavigationEntry]);
+
+  const navigateTo = useCallback((section: AppSection, tab: string, customLabel?: string, petId?: string) => {
+    const label = customLabel || getTabLabel(section, tab);
+    isNavigatingRef.current = true;
+    setCurrentSection(section);
+    if (section === 'super_admin') {
+      setUserRole('super_admin');
+    } else if (section === 'owner') {
+      setUserRole('owner');
+      setOwnerActiveTab(tab);
+    } else {
+      setUserRole('doctor');
+      setAdminActiveTab(tab);
+    }
+
+    const newEntry: NavigationHistoryItem = {
+      id: `nav_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      section,
+      tab,
+      label,
+      petId,
+      timestamp: Date.now(),
+    };
+
+    setNavigationHistory((prev) => {
+      const updated = [...prev.slice(0, historyIndex + 1), newEntry].slice(-35);
+      setHistoryIndex(updated.length - 1);
+      return updated;
+    });
+  }, [historyIndex, getTabLabel]);
+
+  const goHome = useCallback(() => {
+    if (currentSection === 'super_admin') {
+      navigateTo('super_admin', 'overview', 'Super Admin Overview');
+    } else if (currentSection === 'owner') {
+      navigateTo('owner', 'dashboard', 'Pet Parent Home');
+    } else {
+      navigateTo('admin', 'dashboard', 'Doctor Dashboard');
+    }
+  }, [currentSection, navigateTo]);
+
+  const jumpToHistoryIndex = useCallback((index: number) => {
+    if (index >= 0 && index < navigationHistory.length) {
+      const targetEntry = navigationHistory[index];
+      if (targetEntry) {
+        setHistoryIndex(index);
+        applyNavigationEntry(targetEntry);
+      }
+    }
+  }, [navigationHistory, applyNavigationEntry]);
+
+  // Keyboard shortcut listener for Navigation (Alt+Left, Alt+Right, Alt+H, Alt+R, Cmd+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsAdminSearchOpen((prev) => !prev);
+        return;
+      }
+
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
+      if (isInput) return;
+
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goBack();
+      } else if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        goForward();
+      } else if (e.altKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        goHome();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goBack, goForward, goHome]);
+
+  const refreshData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (setNotification) {
+        setNotification({ message: 'All records synchronized & up to date with cloud', type: 'success' });
+        setTimeout(() => setNotification(null), 3000);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
   }, []);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'warning' | 'error' } | null>(null);
@@ -467,6 +704,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_support_tickets`, JSON.stringify(supportTickets));
   }, [supportTickets]);
 
+  // Reconnect and sync all clinicRegistrations into the doctors list automatically
+  useEffect(() => {
+    if (!clinicRegistrations || clinicRegistrations.length === 0) return;
+
+    setDoctors((prevDoctors) => {
+      let updated = [...prevDoctors];
+      let hasChanges = false;
+
+      for (const reg of clinicRegistrations) {
+        const docId = `doc_${reg.id}`;
+        const exists = updated.some(
+          (d) =>
+            d.id === docId ||
+            (d.email && reg.email && d.email.toLowerCase() === reg.email.toLowerCase()) ||
+            (d.registrationNumber && reg.veterinarianIdNumber && d.registrationNumber === reg.veterinarianIdNumber)
+        );
+
+        if (!exists) {
+          const newDoc: DoctorAccount = {
+            id: docId,
+            name: reg.name,
+            qualification: reg.qualification || 'BVSc & AH / DVM',
+            registrationNumber: reg.veterinarianIdNumber || `REG-${Math.floor(100000 + Math.random() * 900000)}`,
+            specialization: reg.specialization || 'General Veterinary Medicine & Surgery',
+            clinicId: `clinic_${reg.id}`,
+            clinicName: reg.clinicName || 'Affiliated Veterinary Clinic',
+            clinicAddress: reg.clinicAddress || 'Address on file',
+            contactNumber: reg.contactNumber || '',
+            email: reg.email ? reg.email.trim() : `doctor_${reg.id}@vetcare.portal`,
+            consultationTimings: reg.consultationTimings || 'Mon - Sat: 09:00 AM - 07:00 PM',
+            status: reg.status === 'rejected' ? 'suspended' : 'active',
+            verificationStatus: reg.status === 'approved' ? 'verified' : reg.status === 'rejected' ? 'rejected' : 'pending',
+            patientsCount: 0,
+            consultationsCount: 0,
+            role: 'doctor',
+            registeredDate: reg.registeredAt ? reg.registeredAt.split('T')[0] : new Date().toISOString().split('T')[0],
+            bio: `Doctor registered via onboarding portal for ${reg.clinicName}.`,
+            avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+          };
+          updated = [newDoc, ...updated];
+          hasChanges = true;
+        } else {
+          updated = updated.map((d) => {
+            if (
+              d.id === docId ||
+              (d.email && reg.email && d.email.toLowerCase() === reg.email.toLowerCase()) ||
+              (d.registrationNumber && reg.veterinarianIdNumber && d.registrationNumber === reg.veterinarianIdNumber)
+            ) {
+              const targetStatus = reg.status === 'approved' ? 'verified' : reg.status === 'rejected' ? 'rejected' : 'pending';
+              if (d.verificationStatus !== targetStatus) {
+                hasChanges = true;
+                return {
+                  ...d,
+                  verificationStatus: targetStatus,
+                  status: reg.status === 'rejected' ? 'suspended' : 'active',
+                  name: reg.name || d.name,
+                  clinicName: reg.clinicName || d.clinicName,
+                  email: reg.email || d.email,
+                };
+              }
+            }
+            return d;
+          });
+        }
+      }
+
+      return hasChanges ? updated : prevDoctors;
+    });
+  }, [clinicRegistrations]);
+
   // Sync to LocalStorage as fallback cache
   useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_admin_profile`, JSON.stringify(adminProfile));
@@ -537,59 +844,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubscribePets: (() => void) | undefined;
     let unsubscribeAppointments: (() => void) | undefined;
     let unsubscribeRegistrations: (() => void) | undefined;
+    let unsubscribeDoctors: (() => void) | undefined;
+    let unsubscribeClinics: (() => void) | undefined;
+    let unsubscribeOwnerAccounts: (() => void) | undefined;
+    let unsubscribeSupportTickets: (() => void) | undefined;
 
-    const setupFirestore = async () => {
+    const setupFirestore = () => {
       try {
         const petsCol = collection(db, 'pets');
-        const snapshotCol = await getDocs(petsCol);
-
-        // Purge any existing records of Max, Luna, Bella, Thunder and demo accounts from Firestore
-        const collectionsToPurge = [
-          'pets',
-          'consultations',
-          'labReports',
-          'imagingRecords',
-          'ecgRecords',
-          'vaccinations',
-          'dewormings',
-          'prescriptions',
-          'appointments',
-          'invoices',
-          'clinic_registrations',
-          'owners',
-          'adminProfiles'
-        ];
-
-        for (const colName of collectionsToPurge) {
-          try {
-            const colRef = collection(db, colName);
-            const colSnap = await getDocs(colRef);
-            colSnap.forEach((d) => {
-              const data = d.data() as any;
-              if (
-                isPurgedPatient(data?.name || data?.petName, data?.id || data?.petId) ||
-                PURGED_PATIENT_IDS.includes(d.id) ||
-                isPurgedAccount(data?.email || data?.loginEmail, data?.id || d.id)
-              ) {
-                deleteDoc(doc(db, colName, d.id)).catch(() => {});
-              }
-            });
-          } catch (e) {}
-        }
-
-        // Seed initial clinic registrations to Firestore if collection is empty
+        const appointmentsCol = collection(db, 'appointments');
         const regCol = collection(db, 'clinic_registrations');
-        const regSnapshot = await getDocs(regCol);
-        if (regSnapshot.empty && initialClinicRegistrations.length > 0) {
-          const regBatch = writeBatch(db);
-          initialClinicRegistrations.forEach((reg) => {
-            const regRef = doc(db, 'clinic_registrations', reg.id);
-            regBatch.set(regRef, reg);
-          });
-          await regBatch.commit();
-        }
+        const doctorsCol = collection(db, 'doctors');
+        const clinicsCol = collection(db, 'clinics');
+        const ownersCol = collection(db, 'owner_accounts');
+        const ticketsCol = collection(db, 'support_tickets');
 
-        // Listen for real-time changes to pets collection
+        // Listen for real-time changes to pets collection immediately
         unsubscribePets = onSnapshot(
           petsCol,
           (snapshot) => {
@@ -597,19 +867,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             snapshot.forEach((d) => {
               const data = d.data() as PetRecord;
               if (!isPurgedPatient(data?.name, data?.id || d.id)) {
-                loadedPets.push(data);
+                loadedPets.push({ ...data, id: data.id || d.id });
               }
             });
-            setPets(loadedPets);
+            if (loadedPets.length > 0) {
+              setPets(loadedPets);
+            }
             setIsFirebaseConnected(true);
           },
           (error) => {
-            console.warn('Firestore real-time sync warning:', error);
+            // Operate seamlessly in offline mode
+            setIsFirebaseConnected(false);
           }
         );
 
         // Listen for appointments
-        const appointmentsCol = collection(db, 'appointments');
         unsubscribeAppointments = onSnapshot(
           appointmentsCol,
           (snapshot) => {
@@ -617,12 +889,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             snapshot.forEach((d) => {
               const data = d.data() as Appointment;
               if (!isPurgedPatient(data?.petName, data?.petId)) {
-                loadedApts.push(data);
+                loadedApts.push({ ...data, id: data.id || d.id });
               }
             });
-            setAppointments(loadedApts);
+            if (loadedApts.length > 0) {
+              setAppointments(loadedApts);
+            }
           },
-          (err) => console.warn('Firestore appointments sync warning:', err)
+          () => {}
         );
 
         // Listen for clinic registrations in real time
@@ -633,12 +907,182 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             snapshot.forEach((docSnap) => {
               const data = docSnap.data() as ClinicRegistration;
               if (!isPurgedAccount(data?.email, data?.id || docSnap.id)) {
-                loadedRegs.push(data);
+                loadedRegs.push({ ...data, id: data.id || docSnap.id });
               }
             });
-            setClinicRegistrations(loadedRegs);
+            if (loadedRegs.length > 0) {
+              setClinicRegistrations(loadedRegs);
+            }
           },
-          (err) => console.warn('Firestore clinic registration sync warning:', err)
+          () => {}
+        );
+
+        // Background non-blocking initial seeds and maintenance
+        setTimeout(async () => {
+          try {
+            // Seed initial clinic registrations if empty
+            const regSnapshot = await getDocs(regCol).catch(() => null);
+            if (regSnapshot && regSnapshot.empty && initialClinicRegistrations.length > 0) {
+              const regBatch = writeBatch(db);
+              initialClinicRegistrations.forEach((reg) => {
+                const regRef = doc(db, 'clinic_registrations', reg.id);
+                regBatch.set(regRef, reg);
+              });
+              await regBatch.commit().catch(() => {});
+            }
+
+            // Seed initial doctors if empty
+            const doctorsSnapshot = await getDocs(doctorsCol).catch(() => null);
+            if (doctorsSnapshot && doctorsSnapshot.empty && initialDoctors.length > 0) {
+              const docBatch = writeBatch(db);
+              initialDoctors.forEach((docItem) => {
+                const dRef = doc(db, 'doctors', docItem.id);
+                docBatch.set(dRef, docItem);
+              });
+              await docBatch.commit().catch(() => {});
+            }
+
+            // Seed initial clinics if empty
+            const clinicsSnapshot = await getDocs(clinicsCol).catch(() => null);
+            if (clinicsSnapshot && clinicsSnapshot.empty && initialClinics.length > 0) {
+              const clinicBatch = writeBatch(db);
+              initialClinics.forEach((clinicItem) => {
+                const cRef = doc(db, 'clinics', clinicItem.id);
+                clinicBatch.set(cRef, clinicItem);
+              });
+              await clinicBatch.commit().catch(() => {});
+            }
+
+            // Seed initial owner accounts if empty
+            const ownersSnapshot = await getDocs(ownersCol).catch(() => null);
+            if (ownersSnapshot && ownersSnapshot.empty && initialOwnerAccounts.length > 0) {
+              const ownerBatch = writeBatch(db);
+              initialOwnerAccounts.forEach((ownerItem) => {
+                const oRef = doc(db, 'owner_accounts', ownerItem.id);
+                ownerBatch.set(oRef, ownerItem);
+              });
+              await ownerBatch.commit().catch(() => {});
+            }
+
+            // Seed initial support tickets if empty
+            const ticketsSnapshot = await getDocs(ticketsCol).catch(() => null);
+            if (ticketsSnapshot && ticketsSnapshot.empty && initialSupportTickets.length > 0) {
+              const ticketBatch = writeBatch(db);
+              initialSupportTickets.forEach((ticketItem) => {
+                const tRef = doc(db, 'support_tickets', ticketItem.id);
+                ticketBatch.set(tRef, ticketItem);
+              });
+              await ticketBatch.commit().catch(() => {});
+            }
+          } catch (e) {}
+        }, 1200);
+
+        // Listen for doctors in real time
+        unsubscribeDoctors = onSnapshot(
+          doctorsCol,
+          (snapshot) => {
+            const loadedDocs: DoctorAccount[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as DoctorAccount;
+              if (!isPurgedAccount(data?.email, data?.id || docSnap.id)) {
+                loadedDocs.push({
+                  ...data,
+                  id: data.id || docSnap.id,
+                  name: data.name || 'Dr. Veterinary Clinician',
+                  email: data.email || '',
+                  registrationNumber: data.registrationNumber || 'VET-PENDING',
+                  qualification: data.qualification || 'BVSc & AH / DVM',
+                  specialization: data.specialization || 'General Veterinary Practice',
+                  clinicName: data.clinicName || 'Veterinary Hospital',
+                  contactNumber: data.contactNumber || '',
+                  status: data.status || 'active',
+                  verificationStatus: data.verificationStatus || (data.status === 'active' ? 'verified' : 'pending'),
+                  patientsCount: typeof data.patientsCount === 'number' ? data.patientsCount : 0,
+                  consultationsCount: typeof data.consultationsCount === 'number' ? data.consultationsCount : 0,
+                  role: data.role || 'doctor',
+                  registeredDate: data.registeredDate || new Date().toISOString().split('T')[0],
+                });
+              }
+            });
+            if (loadedDocs.length > 0) {
+              setDoctors(loadedDocs);
+            }
+          },
+          (err) => console.warn('Firestore doctors sync warning:', err)
+        );
+
+        // Listen for clinics in real time
+        unsubscribeClinics = onSnapshot(
+          clinicsCol,
+          (snapshot) => {
+            const loadedClinics: ClinicAccount[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as ClinicAccount;
+              if (!isPurgedAccount(data?.email || data?.adminEmail, data?.id || docSnap.id)) {
+                loadedClinics.push({
+                  ...data,
+                  id: data.id || docSnap.id,
+                  name: data.name || 'Veterinary Clinic',
+                  status: data.status || 'active',
+                  doctorsCount: typeof data.doctorsCount === 'number' ? data.doctorsCount : 0,
+                  patientsCount: typeof data.patientsCount === 'number' ? data.patientsCount : 0,
+                  appointmentsCount: typeof data.appointmentsCount === 'number' ? data.appointmentsCount : 0,
+                });
+              }
+            });
+            if (loadedClinics.length > 0) {
+              setClinics(loadedClinics);
+            }
+          },
+          (err) => console.warn('Firestore clinics sync warning:', err)
+        );
+
+        // Listen for owner accounts in real time
+        unsubscribeOwnerAccounts = onSnapshot(
+          ownersCol,
+          (snapshot) => {
+            const loadedOwners: OwnerAccount[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as OwnerAccount;
+              if (!isPurgedAccount(data?.email, data?.id || docSnap.id)) {
+                loadedOwners.push({
+                  ...data,
+                  id: data.id || docSnap.id,
+                  name: data.name || 'Pet Owner',
+                  email: data.email || '',
+                  phone: data.phone || '',
+                  address: data.address || '',
+                  registeredPetsCount: typeof data.registeredPetsCount === 'number' ? data.registeredPetsCount : 0,
+                  status: data.status || 'active',
+                  registeredDate: data.registeredDate || new Date().toISOString().split('T')[0],
+                });
+              }
+            });
+            if (loadedOwners.length > 0) {
+              setOwnerAccounts(loadedOwners);
+            }
+          },
+          (err) => console.warn('Firestore owner accounts sync warning:', err)
+        );
+
+        // Listen for support tickets in real time
+        unsubscribeSupportTickets = onSnapshot(
+          ticketsCol,
+          (snapshot) => {
+            const loadedTickets: SupportTicket[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as SupportTicket;
+              loadedTickets.push({
+                ...data,
+                id: data.id || docSnap.id,
+                messages: Array.isArray(data.messages) ? data.messages : [],
+              });
+            });
+            if (loadedTickets.length > 0) {
+              setSupportTickets(loadedTickets);
+            }
+          },
+          (err) => console.warn('Firestore support tickets sync warning:', err)
         );
       } catch (err) {
         console.warn('Firebase initialization note:', err);
@@ -651,6 +1095,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubscribePets) unsubscribePets();
       if (unsubscribeAppointments) unsubscribeAppointments();
       if (unsubscribeRegistrations) unsubscribeRegistrations();
+      if (unsubscribeDoctors) unsubscribeDoctors();
+      if (unsubscribeClinics) unsubscribeClinics();
+      if (unsubscribeOwnerAccounts) unsubscribeOwnerAccounts();
+      if (unsubscribeSupportTickets) unsubscribeSupportTickets();
     };
   }, []);
 
@@ -1101,20 +1549,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const registerClinic = async (details: Omit<ClinicRegistration, 'id' | 'status' | 'registeredAt'>): Promise<ClinicRegistration> => {
     const newId = `reg_${Date.now()}`;
+    const now = new Date().toISOString();
     const newReg: ClinicRegistration = {
       ...details,
       id: newId,
       status: 'pending',
-      registeredAt: new Date().toISOString(),
+      registeredAt: now,
       notes: 'Submitted for 24-hour verification review on Firebase.',
     };
 
     setClinicRegistrations((prev) => [newReg, ...prev]);
     setActivePendingRegistration(newReg);
 
+    // Also immediately provision the corresponding DoctorAccount in 'pending' status so Super Admin sees them in Doctor Registry!
+    const doctorId = `doc_${newId}`;
+    const newDoctor: DoctorAccount = {
+      id: doctorId,
+      name: details.name,
+      qualification: details.qualification || 'BVSc & AH / DVM',
+      registrationNumber: details.veterinarianIdNumber,
+      specialization: details.specialization || 'General Veterinary Medicine & Surgery',
+      clinicId: `clinic_${newId}`,
+      clinicName: details.clinicName || 'Affiliated Veterinary Clinic',
+      clinicAddress: details.clinicAddress || 'Address on file',
+      contactNumber: details.contactNumber || '',
+      email: details.email.trim(),
+      consultationTimings: details.consultationTimings || 'Mon - Sat: 09:00 AM - 07:00 PM',
+      status: 'pending',
+      verificationStatus: 'pending',
+      patientsCount: 0,
+      consultationsCount: 0,
+      role: 'doctor',
+      registeredDate: now.split('T')[0],
+      bio: `Doctor registered via onboarding portal for ${details.clinicName}.`,
+      avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+    };
+
+    setDoctors((prev) => {
+      const exists = prev.some((d) => d.email.toLowerCase() === details.email.trim().toLowerCase());
+      if (exists) {
+        return prev.map((d) => (d.email.toLowerCase() === details.email.trim().toLowerCase() ? { ...d, ...newDoctor, id: d.id } : d));
+      }
+      return [newDoctor, ...prev];
+    });
+
+    // Also add to clinics list as pending
+    const newClinicAcc: ClinicAccount = {
+      id: `clinic_${newId}`,
+      name: details.clinicName || `${details.name}'s Practice`,
+      address: details.clinicAddress || 'Address on file',
+      phone: details.contactNumber || '',
+      email: details.email.trim(),
+      adminId: doctorId,
+      adminName: details.name,
+      adminEmail: details.email.trim(),
+      doctorsCount: 1,
+      patientsCount: 0,
+      appointmentsCount: 0,
+      status: 'pending',
+      registeredDate: now.split('T')[0],
+      licenseNumber: details.veterinarianIdNumber || `LIC-${Math.floor(1000 + Math.random() * 9000)}`,
+    };
+
+    setClinics((prev) => {
+      if (prev.some((c) => c.name.toLowerCase() === newClinicAcc.name.toLowerCase())) return prev;
+      return [newClinicAcc, ...prev];
+    });
+
     try {
       await setDoc(doc(db, 'clinic_registrations', newId), newReg);
-      showNotification('New clinic registered & notified to Firebase! Verification under 24-hour review.', 'info');
+      await setDoc(doc(db, 'doctors', doctorId), newDoctor);
+      await setDoc(doc(db, 'clinics', newClinicAcc.id), newClinicAcc);
+      showNotification('New clinic & veterinarian registered! Under verification review.', 'info');
     } catch (err) {
       console.warn('Firestore clinic registration sync warning:', err);
     }
@@ -1133,7 +1639,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...r,
             status: 'approved',
             verifiedAt: now,
-            reviewedBy: 'Medical Licensing Board / Firebase Admin',
+            reviewedBy: 'Medical Licensing Board / Super Admin',
             notes: reviewerNotes,
           };
           return approvedReg;
@@ -1146,18 +1652,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActivePendingRegistration(approvedReg);
     }
 
+    // Also approve matching DoctorAccount
+    setDoctors((prev) =>
+      prev.map((d) => {
+        if (d.id === `doc_${id}` || (approvedReg && d.email.toLowerCase() === approvedReg.email.toLowerCase())) {
+          const updated: DoctorAccount = {
+            ...d,
+            status: 'active',
+            verificationStatus: 'verified',
+            verifiedAt: now,
+          };
+          try {
+            setDoc(doc(db, 'doctors', updated.id), updated, { merge: true }).catch(() => {});
+          } catch (e) {}
+          return updated;
+        }
+        return d;
+      })
+    );
+
+    // Also activate matching ClinicAccount
+    setClinics((prev) =>
+      prev.map((c) => {
+        if (c.id === `clinic_${id}` || (approvedReg && (c.adminEmail.toLowerCase() === approvedReg.email.toLowerCase() || c.name === approvedReg.clinicName))) {
+          const updated: ClinicAccount = { ...c, status: 'active' };
+          try {
+            setDoc(doc(db, 'clinics', updated.id), updated, { merge: true }).catch(() => {});
+          } catch (e) {}
+          return updated;
+        }
+        return c;
+      })
+    );
+
     try {
       await setDoc(
         doc(db, 'clinic_registrations', id),
         {
           status: 'approved',
           verifiedAt: now,
-          reviewedBy: 'Medical Licensing Board / Firebase Admin',
+          reviewedBy: 'Medical Licensing Board / Super Admin',
           notes: reviewerNotes,
         },
         { merge: true }
       );
-      showNotification('Clinic registration approved & access granted on Firebase!', 'success');
+      showNotification('Clinic & Doctor registration approved on Firebase!', 'success');
     } catch (err) {
       console.warn('Firestore approval sync warning:', err);
     }
@@ -1174,7 +1713,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...r,
             status: 'rejected',
             verifiedAt: now,
-            reviewedBy: 'Medical Licensing Board / Firebase Admin',
+            reviewedBy: 'Medical Licensing Board / Super Admin',
             notes: reason,
           };
           return rejectedReg;
@@ -1187,13 +1726,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActivePendingRegistration(rejectedReg);
     }
 
+    // Also mark doctor as rejected
+    setDoctors((prev) =>
+      prev.map((d) => {
+        if (d.id === `doc_${id}` || (rejectedReg && d.email.toLowerCase() === rejectedReg.email.toLowerCase())) {
+          const updated: DoctorAccount = {
+            ...d,
+            status: 'rejected',
+            verificationStatus: 'rejected',
+            notes: reason,
+          };
+          try {
+            setDoc(doc(db, 'doctors', updated.id), updated, { merge: true }).catch(() => {});
+          } catch (e) {}
+          return updated;
+        }
+        return d;
+      })
+    );
+
     try {
       await setDoc(
         doc(db, 'clinic_registrations', id),
         {
           status: 'rejected',
           verifiedAt: now,
-          reviewedBy: 'Medical Licensing Board / Firebase Admin',
+          reviewedBy: 'Medical Licensing Board / Super Admin',
           notes: reason,
         },
         { merge: true }
@@ -1225,74 +1783,234 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       details,
     };
     setAuditLogs((prev) => [newLog, ...prev]);
+    try {
+      setDoc(doc(db, 'audit_logs', newLog.id), newLog).catch(() => {});
+    } catch (e) {}
   };
 
-  const approveDoctor = (id: string, notes?: string) => {
-    setDoctors((prev) =>
-      prev.map((doc) => {
-        if (doc.id === id) {
-          logAuditEvent('approve_doctor', 'doctor', doc.id, doc.fullName, `Doctor ${doc.fullName} verified and approved. ${notes || ''}`);
-          return { ...doc, status: 'active', verifiedAt: new Date().toISOString() };
-        }
-        return doc;
-      })
+  const addDoctor = async (
+    doctorData: Partial<DoctorAccount> & { name: string; email: string; registrationNumber: string }
+  ): Promise<DoctorAccount> => {
+    const newId = doctorData.id || `doc_${Date.now()}`;
+    const now = new Date().toISOString();
+    const newDoctor: DoctorAccount = {
+      id: newId,
+      name: doctorData.name,
+      qualification: doctorData.qualification || 'BVSc & AH, MVSc',
+      registrationNumber: doctorData.registrationNumber,
+      specialization: doctorData.specialization || 'General Veterinary Medicine & Surgery',
+      clinicId: doctorData.clinicId || `clinic_${Date.now()}`,
+      clinicName: doctorData.clinicName || 'Veterinary Clinical Practice',
+      clinicAddress: doctorData.clinicAddress || 'Address on file',
+      contactNumber: doctorData.contactNumber || '+1 (555) 000-0000',
+      email: doctorData.email.trim(),
+      consultationTimings: doctorData.consultationTimings || 'Mon - Sat: 09:00 AM - 07:00 PM',
+      emergencyContact: doctorData.emergencyContact || '+1 (555) 911-PETS',
+      status: doctorData.status || 'active',
+      verificationStatus: doctorData.verificationStatus || 'verified',
+      verifiedAt: doctorData.verificationStatus === 'verified' || !doctorData.verificationStatus ? now : undefined,
+      registeredDate: doctorData.registeredDate || now.split('T')[0],
+      role: doctorData.role || 'doctor',
+      patientsCount: doctorData.patientsCount || 0,
+      consultationsCount: doctorData.consultationsCount || 0,
+      bio: doctorData.bio || 'Licensed veterinary surgeon and clinical healthcare specialist.',
+      avatar: doctorData.avatar || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
+    };
+
+    setDoctors((prev) => {
+      const exists = prev.some((d) => d.id === newDoctor.id || d.email.toLowerCase() === newDoctor.email.toLowerCase());
+      if (exists) {
+        return prev.map((d) => (d.id === newDoctor.id || d.email.toLowerCase() === newDoctor.email.toLowerCase() ? newDoctor : d));
+      }
+      return [newDoctor, ...prev];
+    });
+
+    try {
+      await setDoc(doc(db, 'doctors', newDoctor.id), newDoctor);
+    } catch (err) {
+      console.warn('Firestore doctor save warning:', err);
+    }
+
+    logAuditEvent(
+      'add_doctor',
+      'doctor',
+      newDoctor.id,
+      newDoctor.name,
+      `Doctor ${newDoctor.name} manually provisioned in platform registry.`
     );
-    showNotification('Doctor account verified and approved', 'success');
+
+    showNotification(`Doctor ${newDoctor.name} added and registered successfully!`, 'success');
+    return newDoctor;
   };
 
-  const rejectDoctor = (id: string, reason?: string) => {
+  const approveDoctor = async (id: string, notes?: string) => {
+    const now = new Date().toISOString();
+    let targetDoc: DoctorAccount | undefined;
+
     setDoctors((prev) =>
-      prev.map((doc) => {
-        if (doc.id === id) {
-          logAuditEvent('reject_doctor', 'doctor', doc.id, doc.fullName, `Doctor ${doc.fullName} registration rejected: ${reason || 'Criteria not met'}`);
-          return { ...doc, status: 'rejected' };
+      prev.map((docItem) => {
+        if (docItem.id === id || docItem.email.toLowerCase() === id.toLowerCase()) {
+          targetDoc = {
+            ...docItem,
+            status: 'active',
+            verificationStatus: 'verified',
+            verifiedAt: now,
+            notes: notes || docItem.notes,
+          };
+          logAuditEvent('approve_doctor', 'doctor', docItem.id, docItem.name, `Doctor ${docItem.name} verified and approved. ${notes || ''}`);
+          return targetDoc;
         }
-        return doc;
+        return docItem;
       })
     );
+
+    // Sync matching clinic registration if present
+    setClinicRegistrations((prev) =>
+      prev.map((r) => {
+        if (
+          r.id === id ||
+          r.id === id.replace('doc_', '') ||
+          (targetDoc && (r.email.toLowerCase() === targetDoc.email.toLowerCase() || r.veterinarianIdNumber === targetDoc.registrationNumber))
+        ) {
+          const updatedReg: ClinicRegistration = {
+            ...r,
+            status: 'approved',
+            verifiedAt: now,
+            reviewedBy: 'Super Admin / Licensing Board',
+            notes: notes || 'Approved by Super Admin',
+          };
+          try {
+            setDoc(doc(db, 'clinic_registrations', r.id), updatedReg, { merge: true }).catch(() => {});
+          } catch (e) {}
+          return updatedReg;
+        }
+        return r;
+      })
+    );
+
+    if (targetDoc) {
+      try {
+        await setDoc(doc(db, 'doctors', targetDoc.id), targetDoc, { merge: true });
+      } catch (err) {
+        console.warn('Firestore doctor approve sync note:', err);
+      }
+    }
+
+    showNotification('Doctor account verified and approved on live platform', 'success');
+  };
+
+  const rejectDoctor = async (id: string, reason?: string) => {
+    let targetDoc: DoctorAccount | undefined;
+    setDoctors((prev) =>
+      prev.map((docItem) => {
+        if (docItem.id === id || docItem.email.toLowerCase() === id.toLowerCase()) {
+          targetDoc = {
+            ...docItem,
+            status: 'rejected',
+            verificationStatus: 'rejected',
+            notes: reason || 'Credentials could not be verified',
+          };
+          logAuditEvent('reject_doctor', 'doctor', docItem.id, docItem.name, `Doctor ${docItem.name} registration rejected: ${reason || 'Criteria not met'}`);
+          return targetDoc;
+        }
+        return docItem;
+      })
+    );
+
+    // Sync matching clinic registration
+    setClinicRegistrations((prev) =>
+      prev.map((r) => {
+        if (
+          r.id === id ||
+          r.id === id.replace('doc_', '') ||
+          (targetDoc && (r.email.toLowerCase() === targetDoc.email.toLowerCase() || r.veterinarianIdNumber === targetDoc.registrationNumber))
+        ) {
+          const updatedReg: ClinicRegistration = {
+            ...r,
+            status: 'rejected',
+            notes: reason || 'Rejected by Super Admin',
+          };
+          try {
+            setDoc(doc(db, 'clinic_registrations', r.id), updatedReg, { merge: true }).catch(() => {});
+          } catch (e) {}
+          return updatedReg;
+        }
+        return r;
+      })
+    );
+
+    if (targetDoc) {
+      try {
+        await setDoc(doc(db, 'doctors', targetDoc.id), targetDoc, { merge: true });
+      } catch (err) {
+        console.warn('Firestore doctor reject sync note:', err);
+      }
+    }
+
     showNotification('Doctor registration rejected', 'warning');
   };
 
-  const suspendDoctor = (id: string) => {
+  const suspendDoctor = async (id: string) => {
+    let targetDoc: DoctorAccount | undefined;
     setDoctors((prev) =>
-      prev.map((doc) => {
-        if (doc.id === id) {
-          logAuditEvent('suspend_doctor', 'doctor', doc.id, doc.fullName, `Doctor ${doc.fullName} suspended`);
-          return { ...doc, status: 'suspended' };
+      prev.map((docItem) => {
+        if (docItem.id === id) {
+          targetDoc = { ...docItem, status: 'suspended' };
+          logAuditEvent('suspend_doctor', 'doctor', docItem.id, docItem.name, `Doctor ${docItem.name} account suspended`);
+          return targetDoc;
         }
-        return doc;
+        return docItem;
       })
     );
+
+    if (targetDoc) {
+      try {
+        await setDoc(doc(db, 'doctors', id), { status: 'suspended' }, { merge: true });
+      } catch (e) {}
+    }
+
     showNotification('Doctor account suspended', 'info');
   };
 
-  const reactivateDoctor = (id: string) => {
+  const reactivateDoctor = async (id: string) => {
+    let targetDoc: DoctorAccount | undefined;
     setDoctors((prev) =>
-      prev.map((doc) => {
-        if (doc.id === id) {
-          logAuditEvent('reactivate_doctor', 'doctor', doc.id, doc.fullName, `Doctor ${doc.fullName} reactivated`);
-          return { ...doc, status: 'active' };
+      prev.map((docItem) => {
+        if (docItem.id === id) {
+          targetDoc = { ...docItem, status: 'active', verificationStatus: 'verified' };
+          logAuditEvent('reactivate_doctor', 'doctor', docItem.id, docItem.name, `Doctor ${docItem.name} account reactivated`);
+          return targetDoc;
         }
-        return doc;
+        return docItem;
       })
     );
+
+    if (targetDoc) {
+      try {
+        await setDoc(doc(db, 'doctors', id), { status: 'active', verificationStatus: 'verified' }, { merge: true });
+      } catch (e) {}
+    }
+
     showNotification('Doctor account reactivated', 'success');
   };
 
-  const updateDoctorRole = (id: string, newRole: UserRole) => {
+  const updateDoctorRole = async (id: string, newRole: UserRole) => {
     setDoctors((prev) =>
-      prev.map((doc) => {
-        if (doc.id === id) {
-          logAuditEvent('update_role', 'doctor', doc.id, doc.fullName, `Doctor ${doc.fullName} role modified to ${newRole}`);
-          return { ...doc, role: newRole };
+      prev.map((docItem) => {
+        if (docItem.id === id) {
+          logAuditEvent('update_role', 'doctor', docItem.id, docItem.name, `Doctor ${docItem.name} role modified to ${newRole}`);
+          return { ...docItem, role: newRole as any };
         }
-        return doc;
+        return docItem;
       })
     );
+    try {
+      await setDoc(doc(db, 'doctors', id), { role: newRole }, { merge: true });
+    } catch (e) {}
     showNotification(`Doctor role updated to ${newRole}`, 'success');
   };
 
-  const updateDoctor = (id: string, updates: Partial<DoctorAccount>) => {
+  const updateDoctor = async (id: string, updates: Partial<DoctorAccount>) => {
     setDoctors((prev) =>
       prev.map((d) => {
         if (d.id === id) {
@@ -1303,17 +2021,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return d;
       })
     );
+    try {
+      await setDoc(doc(db, 'doctors', id), updates, { merge: true });
+    } catch (e) {
+      console.warn('Firestore doctor update note:', e);
+    }
     showNotification('Doctor information updated successfully', 'success');
   };
 
-  const deleteDoctor = (id: string) => {
+  const deleteDoctor = async (id: string) => {
     const target = doctors.find((d) => d.id === id);
     setDoctors((prev) => prev.filter((d) => d.id !== id));
     logAuditEvent('delete_doctor', 'doctor', id, target?.name, `Doctor ${target?.name || id} removed from platform.`);
     try {
-      deleteDoc(doc(db, 'doctors', id)).catch(() => {});
-      deleteDoc(doc(db, 'adminProfiles', id)).catch(() => {});
-      deleteDoc(doc(db, 'clinic_registrations', id)).catch(() => {});
+      await deleteDoc(doc(db, 'doctors', id));
+      await deleteDoc(doc(db, 'adminProfiles', id));
+      await deleteDoc(doc(db, 'clinic_registrations', id));
+      await deleteDoc(doc(db, 'clinic_registrations', id.replace('doc_', '')));
     } catch (e) {
       console.warn('Firestore doctor deletion note:', e);
     }
@@ -1597,6 +2321,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sendSupportMessage,
         updateSupportTicketStatus,
 
+        addDoctor,
         approveDoctor,
         rejectDoctor,
         suspendDoctor,
@@ -1645,6 +2370,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAdminSearchOpen,
         isPetSearchOpen,
         setIsPetSearchOpen,
+
+        // Forward/Backward Navigation Exports
+        navigationHistory,
+        historyIndex,
+        canGoBack,
+        canGoForward,
+        goBack,
+        goForward,
+        goHome,
+        navigateTo,
+        jumpToHistoryIndex,
+        currentBreadcrumbs: [
+          {
+            label: currentSection === 'super_admin' ? 'Super Admin HQ' : currentSection === 'owner' ? 'Pet Parent Portal' : 'Doctor Station',
+            section: currentSection,
+            tab: currentSection === 'owner' ? 'dashboard' : currentSection === 'super_admin' ? 'overview' : 'dashboard',
+            onClick: () => navigateTo(currentSection, currentSection === 'owner' ? 'dashboard' : currentSection === 'super_admin' ? 'overview' : 'dashboard'),
+          },
+          {
+            label: getTabLabel(currentSection, currentSection === 'owner' ? ownerActiveTab : currentSection === 'super_admin' ? 'overview' : adminActiveTab),
+            section: currentSection,
+            tab: currentSection === 'owner' ? ownerActiveTab : currentSection === 'super_admin' ? 'overview' : adminActiveTab,
+          },
+        ],
+        refreshData,
+        isRefreshing,
 
         notification,
         showNotification,

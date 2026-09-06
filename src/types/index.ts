@@ -2,22 +2,37 @@ export type UserRole = 'super_admin' | 'admin' | 'doctor' | 'owner' | 'vet';
 export type AppSection = 'super_admin' | 'admin' | 'doctor' | 'owner';
 export type SpeciesType = 'Canine (Dog)' | 'Feline (Cat)' | 'Equine (Horse)' | 'Bovine (Cattle)' | 'Avian (Bird)' | 'Small Mammal' | 'Reptile' | 'Other';
 
+export interface NavigationHistoryItem {
+  id: string;
+  section: AppSection;
+  tab: string;
+  label: string;
+  subLabel?: string;
+  petId?: string;
+  timestamp: number;
+}
+
 export interface DoctorAccount {
   id: string;
   name: string;
   qualification: string;
   registrationNumber: string;
   specialization: string;
-  clinicId: string;
+  clinicId?: string;
   clinicName: string;
+  clinicAddress?: string;
   contactNumber: string;
   email: string;
   status: 'active' | 'pending' | 'suspended' | 'rejected';
   verificationStatus: 'verified' | 'pending' | 'rejected';
+  consultationTimings?: string;
+  emergencyContact?: string;
+  verifiedAt?: string;
+  notes?: string;
   lastLogin?: string;
   patientsCount: number;
   consultationsCount: number;
-  role: 'doctor';
+  role: 'doctor' | 'admin' | 'super_admin' | 'vet';
   registeredDate: string;
   bio?: string;
   avatar?: string;

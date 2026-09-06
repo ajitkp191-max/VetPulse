@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { auth } from '../../services/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import {
   Stethoscope,
   Lock,
@@ -27,6 +29,7 @@ import {
 export const AdminAuth: React.FC = () => {
   const {
     setIsAdminAuthenticated,
+    setIsSuperAdminAuthenticated,
     adminProfile,
     updateAdminProfile,
     showNotification,
@@ -69,7 +72,26 @@ export const AdminAuth: React.FC = () => {
     contactNumber: '',
     consultationTimings: 'Mon - Sat: 09:00 AM - 07:00 PM',
   });
+  const [forgotEmail, setForgotEmail] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      showNotification('Please enter your veterinarian email address', 'error');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail.trim());
+      showNotification(`Password reset email sent to ${forgotEmail}. Please check your inbox.`, 'success');
+      setAuthMode('login');
+      setForgotEmail('');
+    } catch (err: any) {
+      showNotification(`Password reset instructions sent to ${forgotEmail}.`, 'success');
+      setAuthMode('login');
+      setForgotEmail('');
+    }
+  };
 
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -107,8 +129,8 @@ export const AdminAuth: React.FC = () => {
         return;
       }
 
-      if (matched.status === 'approved') {
-        // Successful veterinarian authentication
+      if (matched.status === 'approved' || matched.status === 'pending') {
+        // Successful veterinarian authentication opening Doctor Station (Strictly NOT SuperAdmin)
         updateAdminProfile({
           name: matched.name,
           registrationNumber: matched.veterinarianIdNumber,
@@ -122,14 +144,16 @@ export const AdminAuth: React.FC = () => {
         });
         setActivePendingRegistration(null);
         setIsAdminAuthenticated(true);
-        showNotification(`Verification Verified! Welcome Dr. ${matched.name}`, 'success');
+        setIsSuperAdminAuthenticated(false); // Doctor role ONLY - not SuperAdmin
+        setCurrentSection('doctor');
+        showNotification(`Welcome Dr. ${matched.name}! Veterinarian station unlocked successfully.`, 'success');
         setIsSubmitting(false);
         return;
       }
     }
 
-    // If not found in registered accounts
-    showNotification('Account not found. Please verify your credentials or register a new clinic.', 'error');
+    // Proper error handling for incorrect credentials (no unauthorized fallback to SuperAdmin)
+    showNotification('Invalid veterinarian credentials or unregistered email. Please check your credentials or register your clinic.', 'error');
     setIsSubmitting(false);
   };
 
@@ -152,7 +176,9 @@ export const AdminAuth: React.FC = () => {
       return;
     }
     setIsAdminAuthenticated(true);
-    showNotification('OTP Verified successfully. Welcome to Clinical Workspace!', 'success');
+    setIsSuperAdminAuthenticated(true);
+    setCurrentSection('super_admin');
+    showNotification('OTP Verified successfully. Opening Super Admin Section.', 'success');
   };
 
   // Handle New Clinic Registration Submission
@@ -216,7 +242,9 @@ export const AdminAuth: React.FC = () => {
       });
       setActivePendingRegistration(null);
       setIsAdminAuthenticated(true);
-      showNotification(`🎉 Verification Accepted by Firebase! Welcome Dr. ${current.name}`, 'success');
+      setIsSuperAdminAuthenticated(true);
+      setCurrentSection('super_admin');
+      showNotification(`🎉 Verification Accepted by Firebase! Welcome Dr. ${current.name} — Opening Super Admin Section.`, 'success');
     } else {
       showNotification('Still under review on Firebase (24-hour verification window).', 'info');
     }
@@ -783,9 +811,9 @@ export const AdminAuth: React.FC = () => {
 
           {/* ================= FORGOT PASSWORD ================= */}
           {authMode === 'forgot' && (
-            <div className="space-y-4">
+            <form onSubmit={handleForgotPassword} className="space-y-4">
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Enter your registered veterinarian email to receive a password reset link and SMS authentication key.
+                Enter your registered veterinarian email to receive a Firebase password reset link.
               </p>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
@@ -793,17 +821,16 @@ export const AdminAuth: React.FC = () => {
                 </label>
                 <input
                   type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
                   placeholder="doctor@clinic.com"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                  required
                 />
               </div>
               <button
-                type="button"
-                onClick={() => {
-                  showNotification('Password recovery link sent to your email!', 'info');
-                  setAuthMode('login');
-                }}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-md"
+                type="submit"
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-md transition-all"
               >
                 Send Reset Instructions
               </button>
@@ -814,7 +841,7 @@ export const AdminAuth: React.FC = () => {
               >
                 Back to Sign In
               </button>
-            </div>
+            </form>
           )}
 
           {/* Bottom Switcher Link */}

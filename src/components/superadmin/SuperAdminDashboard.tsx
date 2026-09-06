@@ -41,6 +41,7 @@ import {
 import { DoctorAccount, ClinicAccount, OwnerAccount, PlatformAuditLog, UserRole } from '../../types';
 import { SuperAdminPetsTab } from './SuperAdminPetsTab';
 import { EditDoctorModal } from './EditDoctorModal';
+import { AddDoctorModal } from './AddDoctorModal';
 import { EditOwnerModal } from './EditOwnerModal';
 
 export const SuperAdminDashboard: React.FC = () => {
@@ -79,6 +80,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [selectedOwnerToDelete, setSelectedOwnerToDelete] = useState<OwnerAccount | null>(null);
   const [selectedAuditLog, setSelectedAuditLog] = useState<PlatformAuditLog | null>(null);
   const [isAddClinicModalOpen, setIsAddClinicModalOpen] = useState(false);
+  const [isAddDoctorModalOpen, setIsAddDoctorModalOpen] = useState(false);
 
   // Doctor Inquiries / Messages Desk State for Super Admin
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -636,21 +638,33 @@ export const SuperAdminDashboard: React.FC = () => {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Filter Status:</span>
-              {(['all', 'verified', 'pending', 'suspended'] as const).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setDoctorStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                    doctorStatusFilter === status
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Filter Status:</span>
+                {(['all', 'verified', 'pending', 'suspended'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setDoctorStatusFilter(status)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
+                      doctorStatusFilter === status
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                id="superadmin-add-doctor-btn"
+                onClick={() => setIsAddDoctorModalOpen(true)}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Veterinarian</span>
+              </button>
             </div>
           </div>
 
@@ -660,12 +674,19 @@ export const SuperAdminDashboard: React.FC = () => {
               <div className="col-span-full p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500">
                 <Stethoscope className="w-10 h-10 mx-auto text-slate-400 mb-2" />
                 <h3 className="font-bold text-slate-700 dark:text-slate-200">No doctors match this filter</h3>
-                <p className="text-xs mt-1">Try adjusting your search criteria or filter status.</p>
+                <p className="text-xs mt-1">Try adjusting your search criteria or register a new doctor.</p>
+                <button
+                  onClick={() => setIsAddDoctorModalOpen(true)}
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold hover:bg-teal-500 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Doctor
+                </button>
               </div>
             ) : (
               filteredDoctors.map((doc) => {
                 const isPending = doc.verificationStatus === 'pending';
-                const isSuspended = doc.status === 'suspended';
+                const isSuspended = doc.status === 'suspended' || doc.verificationStatus === 'rejected';
+                const isActive = !isPending && !isSuspended;
 
                 return (
                   <div
@@ -676,15 +697,15 @@ export const SuperAdminDashboard: React.FC = () => {
                       {/* Top status bar */}
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                             isPending
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
                               : isSuspended
-                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300'
-                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                           }`}
                         >
-                          {isPending ? 'Verification Pending' : isSuspended ? 'Suspended' : 'Verified Doctor'}
+                          {isPending ? 'Pending' : isSuspended ? 'Suspended' : 'Active'}
                         </span>
 
                         <span className="text-[10px] text-slate-400 font-mono">
@@ -703,12 +724,12 @@ export const SuperAdminDashboard: React.FC = () => {
                           <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
                             {doc.name}
                           </h3>
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                            {doc.qualification}
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium truncate">
+                            {doc.qualification || 'BVSc & AH'}
                           </p>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                            <Award className="w-3 h-3 text-slate-400" />
-                            Reg: {doc.registrationNumber}
+                            <Award className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate">Reg: {doc.registrationNumber || 'Pending'}</span>
                           </p>
                         </div>
                       </div>
@@ -717,19 +738,25 @@ export const SuperAdminDashboard: React.FC = () => {
                       <div className="mt-4 space-y-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Specialization:</span>
-                          <span className="font-medium text-right truncate max-w-[170px]">{doc.specialization}</span>
+                          <span className="font-medium text-right truncate max-w-[170px]">{doc.specialization || 'Veterinary Clinician'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Clinic:</span>
-                          <span className="font-medium text-right truncate max-w-[170px]">{doc.clinicName}</span>
+                          <span className="font-medium text-right truncate max-w-[170px]">{doc.clinicName || 'Affiliated Clinic'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Email:</span>
                           <span className="font-mono text-[11px] text-right truncate max-w-[170px]">{doc.email}</span>
                         </div>
+                        {doc.contactNumber && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Phone:</span>
+                            <span className="font-mono text-[11px] text-right truncate max-w-[170px]">{doc.contactNumber}</span>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Consultations:</span>
-                          <span className="font-bold text-slate-900 dark:text-white">{doc.consultationsCount} visits</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{doc.consultationsCount || 0} visits</span>
                         </div>
                       </div>
                     </div>
@@ -1678,6 +1705,13 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal: Add Doctor */}
+      {isAddDoctorModalOpen && (
+        <AddDoctorModal
+          onClose={() => setIsAddDoctorModalOpen(false)}
+        />
       )}
 
       {/* Modal: Edit Doctor Profile & Credentials */}

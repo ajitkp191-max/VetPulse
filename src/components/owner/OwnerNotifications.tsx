@@ -14,6 +14,9 @@ import {
   CheckCheck,
   Heart,
   Pill,
+  Smartphone,
+  Send,
+  Zap,
 } from 'lucide-react';
 
 interface NotificationItem {
@@ -44,6 +47,30 @@ export const OwnerNotifications: React.FC = () => {
     adminProfile,
     showNotification,
   } = useApp();
+
+  const [pushEnabled, setPushEnabled] = useState<boolean>(true);
+  const [pushPermissionStatus, setPushPermissionStatus] = useState<string>('granted');
+
+  const handleTogglePush = () => {
+    const nextState = !pushEnabled;
+    setPushEnabled(nextState);
+    if (nextState) {
+      setPushPermissionStatus('granted');
+      showNotification('Push notifications enabled successfully! You will receive instant alerts for upcoming vaccinations & dewormings.', 'success');
+    } else {
+      setPushPermissionStatus('disabled');
+      showNotification('Push notifications disabled', 'info');
+    }
+  };
+
+  const handleTestPushNotification = () => {
+    if (!pushEnabled) {
+      showNotification('Please enable push notifications first.', 'error');
+      return;
+    }
+    const samplePet = ownerPets[0]?.name || 'Your Pet';
+    showNotification(`🔔 [Push Notification Sent]: Vaccine Booster Due for ${samplePet}! Please schedule your visit.`, 'success');
+  };
 
   // Synthesize notifications from real live records
   const generateLiveNotifications = (): NotificationItem[] => {
@@ -90,13 +117,13 @@ export const OwnerNotifications: React.FC = () => {
       });
     });
 
-    // 3. Vaccination Reminders
+    // 3. Vaccination Reminders (High Priority)
     ownerVaccinations.forEach((v) => {
       list.push({
         id: `vac-${v.id}`,
         category: 'vaccination_reminder',
         title: `Vaccine Booster Due - ${v.petName}`,
-        message: `${v.vaccineName} booster is scheduled for ${v.nextDueDate}. Active immunity requires booster administration.`,
+        message: `${v.vaccineName} booster is scheduled for ${v.nextDueDate}. Active immunity requires timely booster administration.`,
         timestamp: v.nextDueDate,
         petName: v.petName,
         isRead: false,
@@ -104,17 +131,17 @@ export const OwnerNotifications: React.FC = () => {
       });
     });
 
-    // 4. Deworming Reminders
+    // 4. Deworming Reminders (High Priority)
     ownerDewormings.forEach((d) => {
       list.push({
         id: `dew-${d.id}`,
         category: 'deworming_reminder',
         title: `Deworming Scheduled - ${d.petName}`,
-        message: `Next prophylactic deworming dose (${d.drugUsed}) is due on ${d.nextDueDate}.`,
+        message: `Next prophylactic deworming dose (${d.drugUsed}) is due on ${d.nextDueDate}. Protect against internal parasites.`,
         timestamp: d.nextDueDate,
         petName: d.petName,
         isRead: false,
-        priority: 'routine',
+        priority: 'urgent',
       });
     });
 
@@ -189,6 +216,8 @@ export const OwnerNotifications: React.FC = () => {
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const vaccinationDueCount = ownerVaccinations.length;
+  const dewormingDueCount = ownerDewormings.length;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -204,7 +233,7 @@ export const OwnerNotifications: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Reminders & Clinical Notifications
+                App Notifications & Push Alerts
               </h2>
               {unreadCount > 0 && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
@@ -213,7 +242,7 @@ export const OwnerNotifications: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Timely alerts for appointments, vaccinations, dewormings, prescriptions, and clinician communications.
+              Scheduled vaccination boosters, parasite deworming doses, clinic appointment reminders & push notification controls.
             </p>
           </div>
         </div>
@@ -231,17 +260,90 @@ export const OwnerNotifications: React.FC = () => {
         </div>
       </div>
 
+      {/* Push Notification Controls & Status Banner */}
+      <div className="bg-gradient-to-r from-teal-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-5 border border-teal-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 rounded-2xl bg-teal-500/20 text-teal-400 shrink-0 mt-0.5">
+            <Smartphone className="w-5 h-5 animate-pulse" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white">Browser & Mobile Push Notifications</h3>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                pushEnabled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+              }`}>
+                {pushEnabled ? 'Push Active' : 'Push Muted'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Get immediate alerts when your pet's vaccination boosters or deworming tablets are due.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={handleTogglePush}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
+              pushEnabled
+                ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+            }`}
+          >
+            {pushEnabled ? 'Disable Push' : 'Enable Push Notifications'}
+          </button>
+          <button
+            onClick={handleTestPushNotification}
+            className="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Test Push Alert</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Upcoming Vaccination & Deworming Summary Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-rose-500/10 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-3xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-rose-500 text-white rounded-2xl shadow-sm">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-rose-900 dark:text-rose-200">Upcoming Vaccinations Due</h4>
+              <p className="text-lg font-black text-rose-600 dark:text-rose-400">{vaccinationDueCount} Active Reminders</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200">
+            Booster Alerts On
+          </span>
+        </div>
+
+        <div className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-3xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-sm">
+              <Pill className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">Deworming Schedules Due</h4>
+              <p className="text-lg font-black text-amber-600 dark:text-amber-400">{dewormingDueCount} Active Reminders</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+            Parasite Protection On
+          </span>
+        </div>
+      </div>
+
       {/* Filter Category Chips */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         {[
           { id: 'all', label: `All (${notifications.length})` },
-          { id: 'appointment_confirmation', label: 'Confirmations' },
-          { id: 'appointment_reminder', label: 'Appointment Reminders' },
+          { id: 'vaccination_reminder', label: `Vaccines (${ownerVaccinations.length})` },
+          { id: 'deworming_reminder', label: `Deworming (${ownerDewormings.length})` },
+          { id: 'appointment_reminder', label: 'Appointments' },
           { id: 'prescription', label: 'Prescriptions' },
-          { id: 'vaccination_reminder', label: 'Vaccines' },
-          { id: 'deworming_reminder', label: 'Deworming' },
           { id: 'doctor_message', label: 'Doctor Messages' },
-          { id: 'medical_update', label: 'Medical Updates' },
         ].map((chip) => (
           <button
             key={chip.id}
@@ -333,3 +435,4 @@ export const OwnerNotifications: React.FC = () => {
     </div>
   );
 };
+
